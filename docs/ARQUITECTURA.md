@@ -31,16 +31,17 @@ Recrear la jugabilidad básica de Frogger: mover una rana sobre un tablero de 13
 
 ## 4. Componentes
 
-| Componente | Responsabilidad | Miembros clave |
-|---|---|---|
-| `Game` (orquestador) | Propietario del estado; coordina cada frame | `state`, `lives`, `score`, `frog`, `vehicles[]`, `logs[]`, `lanes[]`, `update()`, `draw()`, `reset()`, `checkCollisions()` |
-| `Frog` (jugador) | Movimiento por grid | `col`, `row`, `alive`, `ridingLog`, `move(dir)`, `update()`, `draw()` |
-| `MovingEntity` (base) | Desplazamiento horizontal con *wrap*; evoluciona de [`Obstacle`](../frogger/frogger.js:16) | `xpos`, `ypos`, `w`, `h`, `speed`, `dir`, `update()`, `wrap()`, `draw()` |
-| `Vehicle` | Carro (hereda de `MovingEntity`) | `draw()` |
-| `Log` | Tronco (hereda de `MovingEntity`) | `draw()` |
-| `LaneConfig` (datos) | Define cada fila; cambiar el tablero no exige nuevo código | `type`, `dir`, `speed`, `count`, `holes[]` |
+| Componente | Responsabilidad | Archivo | Miembros clave |
+|---|---|---|---|
+| `Game` (orquestador) | Propietario del estado; coordina cada frame | `game.js` | `state`, `lives`, `score`, `frog`, `vehicles[]`, `logs[]`, `lanes[]`, `update()`, `draw()`, `reset()`, `checkCollisions()` |
+| `Frog` (jugador) | Movimiento por grid | `game.js` | `col`, `row`, `alive`, `ridingLog`, `move(dir)`, `update()`, `draw()` |
+| `MovingEntity` (base) | Desplazamiento horizontal con *wrap* (evoluciona del prototipo `Obstacle`) | `entities.js` | `xpos`, `ypos`, `w`, `h`, `speed`, `dir`, `update()`, `wrap()`, `draw()` |
+| `Vehicle` | Carro (hereda de `MovingEntity`) | `entities.js` | `draw()` |
+| `Log` | Tronco (hereda de `MovingEntity`) | `entities.js` | `draw()` |
+| `lanes[]` (`LaneConfig`) | Define cada fila; cambiar el tablero no exige nuevo código | `game.js` | `type`, `dir`, `speed`, `count`, `holes[]` |
+| Bootstrap p5 | `setup()`, `draw()`, `keyPressed()`, constantes de tablero | `frogger.js` | `CELL`, `COLS`, `ROWS`, `game` |
 
-- Helper de colisiones: `rectsOverlap(a, b)` (AABB de 1 línea).
+- Helper de colisiones: `rectsOverlap(a, b)` (AABB de 1 línea) en `game.js`.
 - Convención: la **rana** vive en coordenadas de grid (`col`, `row`); las **entidades** en píxeles. La conversión ocurre solo al renderizar; las colisiones se resuelven en píxeles.
 
 ## 5. Diagramas
@@ -149,26 +150,54 @@ sequenceDiagram
 
 `keyPressed()` global (flechas + WASD) → delega en `game.frog.move(dir)`. MVP: una celda por tecla, sin cooldown.
 
-## 8. Estructura de archivos (MVP)
+## 8. Estructura de archivos (plan B — adoptado)
 
-**Recomendado: un solo archivo.** Todo vive en [`frogger/frogger.js`](../frogger/frogger.js) (~250 líneas: `Game`, `Frog`, `MovingEntity`, `Vehicle`, `Log`, `LaneConfig`, helper de colisión y funciones p5 `setup()`, `draw()`, `keyPressed()`). [`frogger/index.html`](../frogger/index.html) ya carga p5.js antes que el sketch; no requiere cambios.
+El código se divide en 3 archivos JS + 2 HTML, sin bundler (compatible con GitHub Pages):
 
-**Si crece:** dividir en `frogger/entities.js` (`MovingEntity`, `Vehicle`, `Log`) y `frogger/game.js` (`Game`, `Frog`, entrada y funciones p5), añadiendo dos `<script>` adicionales en [`index.html`](../frogger/index.html) **antes** de `frogger.js`. Sin bundler; compatible con GitHub Pages.
+```
+Frogger-Visual_Computing_2026-II/
+├── index.html            # landing page: enlaces al juego y a la documentación
+├── README.md
+├── docs/
+│   └── ARQUITECTURA.md
+└── frogger/
+    ├── index.html        # carga los scripts en orden: p5 → entities → game → frogger
+    ├── frogger.js        # BOOTSTRAP p5: constantes (CELL, COLS, ROWS), setup(), draw(),
+    │                     #   keyPressed() y la variable global `game`. SIN lógica.
+    ├── game.js           # Game (orquestador), Frog, lanes[] (datos), GAME_STATES,
+    │                     #   LANE_TYPES y rectsOverlap().
+    ├── entities.js       # MovingEntity (base), Vehicle, Log.
+    └── libraries/
+        └── p5.min.js     # p5.js local (sin CDN)
+```
 
-## 9. Estado actual del código
+**Orden de carga (obligatorio, ver [`frogger/index.html`](../frogger/index.html)):**
+`libraries/p5.min.js` → `entities.js` → `game.js` → `frogger.js`.
+La dependencia es lineal: `entities` no depende de nadie; `game` usa `entities`;
+`frogger` (bootstrap) instancia `Game` de `game.js`.
 
-| Existe hoy | Qué cambia |
+**Regla de responsabilidad:** `frogger.js` solo interconecta p5.js con la lógica
+(ninguna regla de juego); `game.js` contiene toda la lógica del juego; `entities.js`
+solo define qué se mueve y cómo se pinta.
+
+## 9. Estado actual del código (plantilla base)
+
+| Existía antes de la refactorización | Estado hoy |
 |---|---|
-| Canvas p5 de 1280×720 en [`setup()`](../frogger/frogger.js:4) | Redimensionar a 715×715 (grid `13 × CELL`) |
-| [`Obstacle`](../frogger/frogger.js:16) con [`update()`](../frogger/frogger.js:30) **sin wrap** (se sale del canvas) | Evoluciona a `MovingEntity` con `wrap()` |
-| Variable global [`obstacle`](../frogger/frogger.js:2) | Se reemplaza por el orquestador `game` |
-| p5.js local en [`index.html:8`](../frogger/index.html:8) | ✅ Ya compatible con GitHub Pages |
+| Canvas p5 de 1280×720 | Redimensionado a 715×715 (`13 × CELL`) en [`setup()`](../frogger/frogger.js) |
+| Clase `Obstacle` con `update()` **sin *wrap*** (se salía del canvas) | Evoluciona a [`MovingEntity`](../frogger/entities.js) con `wrap()` |
+| Variable global `obstacle` suelta | Reemplazada por el orquestador `game` ([`frogger.js`](../frogger/frogger.js)) |
+| p5.js local en [`index.html`](../frogger/index.html) | ✅ Sin cambios, compatible con GitHub Pages |
+
+> **Nota:** la plantilla está lista (clases, herencia, orden de carga y bootstrap),
+> pero los métodos de juego llevan `TODO`: faltan `lanes[]`, el render del tablero,
+> la entrada y las colisiones (sección 10).
 
 ## 10. Orden sugerido de implementación
 
-1. Constantes (`CELL`, `LANE_TYPES`) y `lanes[]`; render del tablero (grass, road, river, agujeros).
-2. `Game` con estados + `Frog` con entrada por grid.
-3. `MovingEntity` + `Vehicle` + carretera con *wrap*.
-4. `Log` + río + mecánica de montarse en troncos.
-5. `checkCollisions()` y reglas de sección 6.
-6. HUD (vidas, score) y transiciones finales de estado.
+1. `lanes[]` (13 filas) en `game.js` + `drawBoard()` en `Game` (grass, road, river, agujeros).
+2. Poblado en `setup()` (`frogger.js`): `game.frog = new Frog(6, 12)`, `vehicles[]` y `logs[]` desde `lanes`.
+3. `Frog.move(dir)` + mapeo de teclas en `keyPressed()`.
+4. `checkCollisions()` y reglas de la sección 6.
+5. `reset()` + transiciones de estado (`WON`, `GAME_OVER`).
+6. HUD (vidas, score) en `Game.draw()`.

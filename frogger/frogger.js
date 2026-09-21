@@ -1,37 +1,39 @@
-const vel = 1;
-let obstacle; // Declaración de la variable global
+const CELL = 55;
+const COLS = 13;
+const ROWS = 13;
+const BOARD = COLS * CELL;
+
+let frog;
 
 function setup() {
-  createCanvas(1280, 720);
-  obstacle = new Obstacle();
+  createCanvas(BOARD, BOARD);
+  frog = new Frog();
+  // TODO
 }
 
 function draw() {
   background(0);
-  obstacle.draw();
-  obstacle.update();
-  //rect(50, 50, 75, 100);
+  Frog.update();
+  Frog.draw();
 }
 
-class Obstacle {
-  constructor() {
-    this.xpos = 0;
-    this.vivo = true;
-  }
+// let game;
 
-  draw() {
-    push();
-      noStroke();
-      fill(255, 0, 0);
-      rect(this.xpos, 0, 100, 100);
-    pop();
-  }
+// function setup() {
+//   createCanvas(BOARD, BOARD);
+//   game = new Game();
+//   // TODO
+// }
 
-  update() {
-    this.xpos = this.xpos + vel; 
-  }
-  
-  alive(){
-    this.vivo = false;
-  }
-}
+// function draw() {
+//   background(0);
+//   game.update();
+//   game.draw();
+// }
+
+// function keyPressed() {
+//   // TODO
+// }
+
+
+
