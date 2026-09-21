@@ -2,7 +2,7 @@ const vel = 1;
 let obstacle; // Declaración de la variable global
 
 function setup() {
-  createCanvas(800, 1000);
+  createCanvas(1280, 720);
   obstacle = new Obstacle();
 }
 
