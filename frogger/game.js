@@ -1,5 +1,5 @@
-const LANE_TYPES = { SAFE: 0, ROAD: 1, RIVER: 2, HOME: 3 };
-const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', WON: 'WON', GAME_OVER: 'GAME_OVER' };
+const LANE_TYPES = { SAFE: 0, ROAD: 1, RIVER: 2, HOME: 3 }
+const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
 
 const lanes = [
   // TODO
@@ -8,13 +8,13 @@ const lanes = [
 
 class Game {
     constructor () {
-        this.state = GAME_STATES.READY;
-        this.lives = 3;
-        this.score = 0;
-        this.frog = null;
-        this.vehicles = [];
-        this.logs = [];
-        this.lanes = lanes;
+        this.state = GAME_STATES.READY
+        this.lives = 3
+        this.score = 0
+        this.frog = null
+        this.vehicles = []
+        this.logs = []
+        this.lanes = lanes
     }
 
     update () {
@@ -35,26 +35,40 @@ class Game {
 }
 
 class Frog {
-    constructor(pos) {
-    this.pos = pos;
-    this.alive = true;
-    this.ridingLog = null;
+    constructor (position, size) {
+    this.position = position
+    this.size = size
+    this.alive = true
+    this.ridingLog = null
     }
 
-    move (dir) {
-        // TODO
+    move (direction) {
+        
+        let next_position = p5.Vector.add(this.position, direction);
+
+        if (next_position.x > width - this.size || next_position.x < 0 ||
+            next_position.y > height - this.size || next_position.y < 0)
+            return
+
+        if (this.alive != true) 
+            return
+        
+        this.position = next_position
     }
 
     update() {
-        // TODO
+        if (this.ridingLog != null)
+            this.move(p5.Vector.mult(this.ridingLog.direction, this.ridingLog.speed))
     }
 
     draw() {
-        // TODO
+        rect(this.position.x, this.position.y, this.size, this.size)
     }
 }
 
 function rectsOverlap (a, b) {
-    return  a.x < b.x + b.w && a.x + a.w > b.x &&
-            a.y < b.y + b.h && a.y + a.h > b.y;
+    return  a.position.x < b.position.x + b.entity_width && 
+            a.position.x + a.size > b.position.x &&
+            a.position.y < b.position.y + b.entity_height && 
+            a.position.y + a.size > b.position.y
 }
