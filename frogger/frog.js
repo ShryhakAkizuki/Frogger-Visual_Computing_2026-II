@@ -4,15 +4,15 @@ class Frog {
     this.position = position
     this.size = size
     this.alive = true
-    this.ridingLog = null   // tronco sobre el que va; lo fija Game.checkCollisions()
+    this.ridingLog = null   // tronco sobre el que va; lo fija RiverLane.checkFrog()
   }
 
-  // Salto: `direction` es el desplazamiento en píxeles. No se mueve si se saldría del canvas
+  // Salto: `direction` es el desplazamiento en píxeles. No se mueve si se saldría del tablero
   // o si la rana está muerta.
   move(direction) {
-    let next_position = p5.Vector.add(this.position, direction);
+    let next_position = p5.Vector.add(this.position, direction)
 
-    if (next_position.x > width - this.size || next_position.x < 0 ||
+    if (next_position.x > BOARD - this.size || next_position.x < 0 ||
       next_position.y > BOARD - this.size || next_position.y < 0)
       return
 
@@ -22,29 +22,47 @@ class Frog {
     this.position = next_position
   }
 
-  // Arrastre por el tronco.
-  // TODO (bug conocido): no usar move(), porque bloquea en los bordes y deja la rana
-  // desincronizada del tronco. Sumar directamente la velocidad a this.position y dejar
-  // que Game.checkCollisions() decida si salió del canvas (docs/ARQUITECTURA.md §9).
+  // Arrastre por el tronco: suma directamente su velocidad (sin pasar por move(), que se
+  // bloquea en los bordes). Si el tronco la saca del tablero, Game.checkCollisions() la mata.
   update() {
     if (this.ridingLog != null)
-      this.move(p5.Vector.mult(this.ridingLog.direction, this.ridingLog.speed))
+      this.position.add(p5.Vector.mult(this.ridingLog.direction, this.ridingLog.speed))
   }
 
-  // TODO (bug conocido): envolver en push()/pop() y fijar fill() para no heredar
-  // el estado de dibujo del elemento anterior.
+  centerX() {
+    return this.position.x + this.size / 2
+  }
+
+  // Fila del tablero en la que está (0 = HOME)
+  row() {
+    return floor((this.position.y + this.size / 2) / CELL)
+  }
+
+  // Caja de colisión reducida `margin` píxeles por lado, para que rozar un carro
+  // con el borde no cuente como choque
+  hitbox(margin = 4) {
+    return {
+      x: this.position.x + margin,
+      y: this.position.y + margin,
+      w: this.size - 2 * margin,
+      h: this.size - 2 * margin,
+    }
+  }
+
   draw() {
-    fill(255);
+    push()
+    noStroke()
+    fill(255)
     rect(this.position.x, this.position.y, this.size, this.size)
+    pop()
   }
 }
 
-// Colisión entre cajas alineadas a los ejes (AABB).
-// `a` es la rana (usa `size`); `b` es una entidad (usa `entity_width` / `entity_height`).
-// TODO: unificar la forma de las cajas para que sirva con cualquier par de objetos.
+// Colisión entre cajas alineadas a los ejes (AABB). `a` y `b` son cajas { x, y, w, h },
+// p. ej. frog.hitbox() y entity.bounds().
 function rectsOverlap(a, b) {
-  return a.position.x < b.position.x + b.entity_width &&
-    a.position.x + a.size > b.position.x &&
-    a.position.y < b.position.y + b.entity_height &&
-    a.position.y + a.size > b.position.y
+  return a.x < b.x + b.w &&
+    a.x + a.w > b.x &&
+    a.y < b.y + b.h &&
+    a.y + a.h > b.y
 }

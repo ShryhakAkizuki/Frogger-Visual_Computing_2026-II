@@ -1,28 +1,32 @@
 // LÓGICA DEL JUEGO: estados, filas, orquestador (Game), jugador (Frog) y colisiones.
-// Usa las entidades de entities.js y las constantes de frogger.js (CELL, COLS, ROWS, BOARD).
+// Usa las filas de lanes.js, la rana de frog.js y las constantes de frogger.js (CELL, BOARD, HUD_H).
 
 const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
 
-// Una fila por entrada, de arriba a abajo (13 en total). Cada una es un objeto de lanes.js;
-// la velocidad, dirección y cantidad de cada fila están en sus argumentos
-// (valores de docs/ARQUITECTURA.md §3.1).
+// Una fila por entrada, de arriba a abajo (13 en total). Cada una es un objeto de lanes.js.
+// RoadLane / RiverLane: (direction, speed, loopCells, pattern)
+//   direction: -1 (←) o 1 (→) · speed: píxeles por frame (docs/ARQUITECTURA.md §3.1)
+//   loopCells: longitud de la pista circular en celdas (13 visibles + el resto fuera de pantalla)
+//   pattern:   [{ x, w }] posición inicial y ancho de cada carro / tronco, en celdas
 // Es una función porque las filas usan CELL / BOARD, que frogger.js define después de cargar
 // este archivo: se instancian en el constructor de Game, ya con todo cargado.
 const createLanes = () => [
-  new HomeLane([1, 4, 7, 10]),   // 0
-  new RiverLane(-1, 1.25, 3),    // 1
-  new RiverLane( 1, 1.0,  3),    // 2
-  new RiverLane(-1, 1.5,  3),    // 3
-  new RiverLane( 1, 2.0,  2),    // 4
-  new RiverLane(-1, 1.25, 3),    // 5
-  new SafeLane(),                // 6
-  new RoadLane(-1, 1.5,  3),     // 7
-  new RoadLane( 1, 2.5,  2),     // 8
-  new RoadLane(-1, 2.0,  3),     // 9
-  new RoadLane( 1, 3.0,  2),     // 10
-  new RoadLane(-1, 1.75, 3),     // 11
-  new SafeLane(),                // 12
+  new HomeLane([1, 4, 7, 10]),                                                    // 0
+  new RiverLane(-1, 1.25, 18, [{ x: 0, w: 3 }, { x: 6, w: 4 }, { x: 12, w: 3 }]), // 1
+  new RiverLane( 1, 1.0,  17, [{ x: 0, w: 4 }, { x: 7, w: 4 }, { x: 13, w: 2 }]), // 2
+  new RiverLane(-1, 1.5,  18, [{ x: 1, w: 5 }, { x: 9, w: 3 }, { x: 14, w: 2 }]), // 3
+  new RiverLane( 1, 2.0,  17, [{ x: 0, w: 2 }, { x: 5, w: 3 }, { x: 11, w: 2 }]), // 4
+  new RiverLane(-1, 1.25, 18, [{ x: 2, w: 4 }, { x: 9, w: 4 }]),                  // 5
+  new SafeLane(),                                                                 // 6
+  new RoadLane(-1, 1.5,  15, [{ x: 0, w: 1 }, { x: 4, w: 1 }, { x: 8, w: 1 }]),   // 7
+  new RoadLane( 1, 2.5,  16, [{ x: 0, w: 2 }, { x: 7, w: 2 }]),                   // 8
+  new RoadLane(-1, 2.0,  17, [{ x: 0, w: 3 }, { x: 8, w: 3 }]),                   // 9  camiones
+  new RoadLane( 1, 3.0,  16, [{ x: 3, w: 1 }]),                                   // 10 un carro rápido
+  new RoadLane(-1, 1.75, 16, [{ x: 0, w: 1 }, { x: 3, w: 1 }, { x: 9, w: 2 }]),   // 11
+  new SafeLane(),                                                                 // 12
 ]
+
+const HOME_POINTS = 100   // puntos por llenar un agujero
 
 
 // Orquestador: es dueño del estado y coordina cada frame (lo llama frogger.js).
@@ -32,25 +36,23 @@ class Game {
     this.lives = 3
     this.score = 0
     this.frog = null
-    this.vehicles = []
-    this.logs = []
     this.lanes = createLanes()
-    this.filledHoles = []   // un booleano por agujero; true = ya ocupado
     this.reset()
   }
 
   // Un frame de lógica. Orden según docs/ARQUITECTURA.md §5.3:
-  // primero se detectan colisiones (fija frog.ridingLog), luego se mueve todo.
+  // primero se aplican las reglas (fija frog.ridingLog), luego se mueve todo. La rana y su
+  // tronco se desplazan lo mismo en este frame, así que siguen alineados.
   update() {
     if (this.state != GAME_STATES.PLAYING)
       return
 
     this.checkCollisions()
+    if (this.state != GAME_STATES.PLAYING)
+      return
 
-    for (const vehicle of this.vehicles)
-      vehicle.update()
-    for (const log of this.logs)
-      log.update()
+    for (const lane of this.lanes)
+      lane.update()
 
     this.frog.update()
   }
@@ -64,13 +66,6 @@ class Game {
     push()
     translate(0, HUD_H)
     this.drawBoard()
-
-    for (const log of this.logs)
-      log.draw()
-
-    for (const vehicle of this.vehicles)
-      vehicle.draw()
-
     this.frog.draw()
     pop()
 
@@ -78,10 +73,10 @@ class Game {
     this.drawHUD()
   }
 
-  // Cada fila se dibuja a sí misma (polimorfismo: ver lanes.js)
+  // Cada fila dibuja su fondo y sus entidades (polimorfismo: ver lanes.js)
   drawBoard() {
-    for (let row = 0; row < this.lanes.length; row++)
-      this.lanes[row].draw(row, this.filledHoles)
+    for (const lane of this.lanes)
+      lane.draw()
   }
 
   // Barra superior: score. Barra inferior: vidas y tiempo.
@@ -108,33 +103,33 @@ class Game {
   }
 
   // Reglas de docs/ARQUITECTURA.md §6. Se llama una vez por frame desde update().
+  // Las reglas de cada tipo de fila (carros, río, agujeros) viven en Lane.checkFrog();
+  // aquí solo se aplican las comunes y se reacciona al resultado.
   checkCollisions() {
     if (!this.frog.alive)
       return
 
-    // Regla 1 (ya implementada): tocar un carro mata
-    for (const vehicle of this.vehicles) {
-      if (rectsOverlap(this.frog, vehicle)) {
-        this.loseLife()
-        return
-      }
+    // Fuera del tablero (solo puede pasar arrastrada por un tronco) -> muere
+    const centerX = this.frog.centerX()
+    if (centerX < 0 || centerX > BOARD) {
+      this.loseLife()
+      return
     }
 
-    // Regla 3 (ya implementada): si toca un tronco, se sube; si no, ridingLog queda en null
+    // Solo la fila en la que está la rana decide; fuera del río no va sobre ningún tronco
+    const lane = this.lanes[this.frog.row()]
     this.frog.ridingLog = null
-    for (const log of this.logs) {
-      if (rectsOverlap(this.frog, log)) {
-        this.frog.ridingLog = log
-        break
-      }
-    }
+    const result = lane.checkFrog(this.frog)
 
-    // TODO regla 2: si la rana está en una fila RIVER y ridingLog es null, loseLife().
-    //   La fila se obtiene con floor(this.frog.position.y / CELL) y se consulta en this.lanes.
-    // TODO: si el tronco la saca del canvas (x < 0 o x > width - size), loseLife().
-    // TODO reglas 4 y 5: si está en la fila HOME, comprobar si cae en un agujero libre
-    //   (marcar this.filledHoles, sumar score, respawnFrog(); si se llenan los 4 -> WON)
-    //   o fuera de uno / en uno lleno (loseLife()).
+    if (result == FROG_RESULT.DIE) {
+      this.loseLife()
+    } else if (result == FROG_RESULT.HOME) {
+      this.score += HOME_POINTS
+      if (lane.allFilled())
+        this.state = GAME_STATES.WON   // regla 7
+      else
+        this.respawnFrog()
+    }
   }
 
   // Regla 6: toda muerte resta una vida; con 0 vidas GAME_OVER, si no la rana reaparece.
@@ -153,29 +148,14 @@ class Game {
     this.frog = new Frog(createVector(CELL * 6, CELL * 12), CELL)
   }
 
-  // Pide a cada fila sus entidades (las filas SAFE / HOME devuelven []) y las reparte
-  // en vehicles[] y logs[] según su clase.
-  buildEntities() {
-    this.vehicles = []
-    this.logs = []
-
-    for (let row = 0; row < this.lanes.length; row++) {
-      for (const entity of this.lanes[row].createEntities(row)) {
-        if (entity instanceof Vehicle)
-          this.vehicles.push(entity)
-        else
-          this.logs.push(entity)
-      }
-    }
-  }
-
-  // Reinicia toda la partida (también se usa al construir el juego).
+  // Reinicia toda la partida (también se usa al construir el juego): cada fila recrea
+  // sus entidades en su posición inicial y vacía sus agujeros.
   reset() {
     this.state = GAME_STATES.READY
     this.lives = 3
     this.score = 0
-    this.filledHoles = [false, false, false, false]
-    this.buildEntities()
+    for (let row = 0; row < this.lanes.length; row++)
+      this.lanes[row].build(row)
     this.respawnFrog()
   }
 
