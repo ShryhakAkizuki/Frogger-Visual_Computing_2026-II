@@ -1,5 +1,4 @@
-// ENTIDADES: cosas que se mueven solas por el tablero (carros y troncos).
-// No conocen las reglas del juego; las filas de lanes.js las crean, las poseen y las mueven.
+// Carros y troncos. No conocen las reglas del juego: las filas de lanes.js los crean y mueven.
 
 // Base: se desplaza en línea recta sobre una pista circular de longitud `loopLength` (píxeles).
 // La parte visible de la pista es [0, BOARD); el resto queda fuera de pantalla, y es lo que
@@ -7,7 +6,7 @@
 class MovingEntity {
   // position: p5.Vector en píxeles (esquina superior izquierda)
   // direction: vector unitario, p. ej. createVector(1, 0) o createVector(-1, 0)
-  // speed: píxeles por frame (ver tabla de velocidades por fila, docs/ARQUITECTURA.md §3.1)
+  // speed: píxeles por frame
   // loopLength: longitud total de la pista; debe ser >= BOARD + entity_width
   constructor(position, entity_width, entity_height, speed, direction, loopLength) {
     this.position = position
@@ -34,12 +33,11 @@ class MovingEntity {
     }
   }
 
-  // Caja de colisión en coordenadas del tablero
   bounds() {
     return { x: this.position.x, y: this.position.y, w: this.entity_width, h: this.entity_height }
   }
 
-  // Dibujo por defecto (gris); las subclases lo sobrescriben
+  // Las subclases lo sobrescriben
   draw() {
     push()
     noStroke()
@@ -49,7 +47,6 @@ class MovingEntity {
   }
 }
 
-// Carro: si la rana lo toca, muere (regla en RoadLane.checkFrog)
 class Vehicle extends MovingEntity {
   constructor(position, vehicle_width, vehicle_height, speed, direction, loopLength, color) {
     super(position, vehicle_width, vehicle_height, speed, direction, loopLength)
@@ -65,7 +62,6 @@ class Vehicle extends MovingEntity {
   }
 }
 
-// Tronco: la rana puede subirse y es arrastrada con su velocidad (Frog.ridingLog)
 class Log extends MovingEntity {
   constructor(position, log_width, log_height, speed, direction, loopLength) {
     super(position, log_width, log_height, speed, direction, loopLength)

@@ -7,8 +7,7 @@ class Frog {
     this.ridingLog = null   // tronco sobre el que va; lo fija RiverLane.checkFrog()
   }
 
-  // Salto: `direction` es el desplazamiento en píxeles. No se mueve si se saldría del tablero
-  // o si la rana está muerta.
+  // Salto de `direction` píxeles; se ignora si saldría del tablero o la rana está muerta
   move(direction) {
     let next_position = p5.Vector.add(this.position, direction)
 
@@ -33,7 +32,7 @@ class Frog {
     return this.position.x + this.size / 2
   }
 
-  // Fila del tablero en la que está (0 = HOME)
+  // 0 = HOME
   row() {
     return floor((this.position.y + this.size / 2) / CELL)
   }

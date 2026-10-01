@@ -1,14 +1,12 @@
-// FILAS DEL TABLERO: cada tipo de fila es una clase que posee sus entidades, las mueve, las
-// dibuja y decide qué le pasa a la rana cuando está en ella.
-// Game solo recorre la lista de filas y llama a los mismos métodos en todas (polimorfismo).
-// Usa Vehicle y Log de entities.js y las constantes de frogger.js (CELL, COLS, BOARD).
+// Filas del tablero. Cada tipo de fila posee sus entidades, las mueve, las dibuja y decide
+// qué le pasa a la rana cuando está en ella. Game trata a todas por igual a través de Lane.
 
 const LANE_TYPES = { SAFE: 0, ROAD: 1, RIVER: 2, HOME: 3 }
 
-// Resultado de Lane.checkFrog(): qué debe hacer Game con la rana
+// Lo que devuelve Lane.checkFrog() para que Game reaccione
 const FROG_RESULT = { OK: 'OK', DIE: 'DIE', HOME: 'HOME' }
 
-// Interfaz base: lo que Game espera de cualquier fila.
+// Interfaz base de todas las filas
 class Lane {
   constructor(type) {
     this.type = type
@@ -16,43 +14,40 @@ class Lane {
     this.entities = []
   }
 
-  // (Re)crea el contenido de la fila al empezar una partida. `row`: índice de la fila (0 = arriba).
+  // Se llama al empezar cada partida; `row` es el índice de la fila (0 = arriba)
   build(row) {
     this.row = row
     this.entities = []
   }
 
-  // Mueve las entidades de la fila
   update() {
     for (const entity of this.entities)
       entity.update()
   }
 
-  // Dibuja el fondo y luego las entidades
   draw() {
     this.drawBackground()
     for (const entity of this.entities)
       entity.draw()
   }
 
-  // Fondo de la fila. Obligatorio en cada subclase.
+  // Obligatorio en cada subclase
   drawBackground() {
     throw new Error("Lane.drawBackground() debe implementarse en la subclase")
   }
 
-  // Qué le pasa a la rana que está en esta fila. Por defecto nada.
+  // Por defecto la fila es segura
   checkFrog(frog) {
     return FROG_RESULT.OK
   }
 
-  // Auxiliar: pinta el fondo de la fila de un solo color.
   fillRow(c) {
     noStroke()
     fill(c)
     rect(0, this.row * CELL, BOARD, CELL)
   }
 
-  // Auxiliar: crea las entidades de un patrón definido a mano sobre una pista circular.
+  // Crea las entidades de un patrón definido a mano sobre una pista circular.
   //   loopCells: longitud de la pista en celdas; las celdas >= COLS quedan fuera de pantalla
   //   pattern:   [{ x, w }, ...] posición inicial y ancho de cada entidad, en celdas
   //   make(position, width, loopLength): construye cada entidad
@@ -69,8 +64,8 @@ class Lane {
     }
   }
 
-  // Comprueba que el patrón quepa en la pista sin solaparse (también a través del wrap)
-  // y que ninguna entidad aparezca de golpe dentro del tablero al dar la vuelta.
+  // Falla al arrancar si dos entidades se solapan (también a través del wrap) o si la pista
+  // es tan corta que una entidad aparecería de golpe dentro del tablero al dar la vuelta.
   validatePattern(loopCells, pattern) {
     const widest = Math.max(...pattern.map(e => e.w))
     if (loopCells < COLS + widest)
@@ -87,7 +82,6 @@ class Lane {
   }
 }
 
-// Zona segura: solo fondo
 class SafeLane extends Lane {
   constructor() {
     super(LANE_TYPES.SAFE)
@@ -98,7 +92,7 @@ class SafeLane extends Lane {
   }
 }
 
-// Meta: fondo y agujeros en las columnas indicadas; guarda cuáles están ocupados
+// Meta: agujeros en las columnas indicadas; guarda cuáles están ocupados
 class HomeLane extends Lane {
   // holes: columnas de los agujeros, p. ej. [1, 4, 7, 10]
   constructor(holes) {
@@ -120,8 +114,8 @@ class HomeLane extends Lane {
     }
   }
 
-  // Reglas 4 y 5: entra en un agujero libre -> HOME; pared o agujero ocupado -> DIE.
-  // Se usa el centro de la rana, que puede llegar desalineada desde un tronco.
+  // Agujero libre -> HOME; pared o agujero ocupado -> DIE. Se usa el centro de la rana
+  // porque puede llegar desalineada desde un tronco.
   checkFrog(frog) {
     const hole = this.holeAt(frog.centerX())
     if (hole == -1 || this.filled[hole])
@@ -135,15 +129,14 @@ class HomeLane extends Lane {
     return this.filled.every(filled => filled)
   }
 
-  // Índice del agujero bajo la coordenada x (en píxeles), o -1 si no hay ninguno.
+  // Índice del agujero bajo la x en píxeles, o -1
   holeAt(x) {
     return this.holes.indexOf(floor(x / CELL))
   }
 }
 
-// Carretera: carros con la velocidad y dirección de la fila
+// Todos los carros de una fila comparten velocidad y dirección
 class RoadLane extends Lane {
-  // direction: -1 (←) o 1 (→) · speed: píxeles por frame
   // loopCells y pattern: ver Lane.buildPattern()
   constructor(direction, speed, loopCells, pattern, vehicleColor = "#FF0000") {
     super(LANE_TYPES.ROAD)
@@ -165,7 +158,7 @@ class RoadLane extends Lane {
     this.fillRow("black")
   }
 
-  // Regla 1: tocar un carro mata (caja de la rana reducida, ver Frog.hitbox())
+  // Usa la caja reducida de la rana: rozar un carro con el borde no mata
   checkFrog(frog) {
     for (const vehicle of this.entities) {
       if (rectsOverlap(frog.hitbox(), vehicle.bounds()))
@@ -175,9 +168,8 @@ class RoadLane extends Lane {
   }
 }
 
-// Río: troncos con la velocidad y dirección de la fila
+// Todos los troncos de una fila comparten velocidad y dirección
 class RiverLane extends Lane {
-  // direction: -1 (←) o 1 (→) · speed: píxeles por frame
   // loopCells y pattern: ver Lane.buildPattern()
   constructor(direction, speed, loopCells, pattern) {
     super(LANE_TYPES.RIVER)
@@ -197,7 +189,7 @@ class RiverLane extends Lane {
     this.fillRow("blue")
   }
 
-  // Reglas 2 y 3: sobre un tronco viaja con él; en el agua sin tronco se hunde
+  // Sobre un tronco viaja con él; en el agua se hunde
   checkFrog(frog) {
     frog.ridingLog = this.entities.find(log => log.carries(frog)) || null
     return frog.ridingLog ? FROG_RESULT.OK : FROG_RESULT.DIE

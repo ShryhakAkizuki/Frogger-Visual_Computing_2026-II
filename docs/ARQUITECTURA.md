@@ -1,49 +1,85 @@
-# Frogger — Arquitectura y flujo MVP
+# Frogger — Arquitectura
 
-> Guía compacta para el equipo de desarrollo · Proyecto de curso: Visual Computing (2026-II).
+> Guía para el equipo de desarrollo · Proyecto de curso: Visual Computing (2026-II).
 > Stack: JavaScript (ES6+) + p5.js (local, sin CDN) · Despliegue: GitHub Pages.
 
 ## 1. Objetivo
 
-Recrear la jugabilidad básica de Frogger: mover una rana sobre un tablero de 13×13 celdas, cruzar la carretera (evitar carros) y el río (nadar sobre troncos) hasta llenar los 4 agujeros de la meta.
+Recrear el primer nivel de Frogger. La rana se mueve sobre un tablero de 13×13 celdas: cruza la carretera esquivando carros y el río saltando sobre troncos, hasta llenar los 4 agujeros de la meta.
 
-## 2. Alcance MVP
+## 2. Estado del proyecto
 
-| ✅ Incluir | ❌ Excluir (post-MVP) |
-|---|---|
-| Rana con movimiento de 1 celda (`CELL` px) por tecla, 4 direcciones | Tortugas que se detienen en orillas |
-| Carretera con carros en movimiento | Sprites, sonidos, animaciones |
-| Río con troncos en movimiento (transportan a la rana) | Temporizador por vida (límite que mata a la rana); el tiempo solo se muestra en el HUD |
-| Meta: 4 agujeros en la fila superior | Dificultad progresiva / múltiples niveles |
-| Máquina de estados: `READY` / `PLAYING` / `WON` / `GAME_OVER` | Récord persistente |
-| Vidas, score y HUD simple | Movimiento suave de la rana (interpolado) |
+### ✅ Funciona
 
-## 3. Tablero (13 columnas × 13 filas · `CELL = 55px` → tablero 715×715, canvas 715×825)
+- Tablero de 13 filas con HUD arriba (score) y abajo (vidas).
+- Rana con saltos de una celda (flechas o WASD), que no puede salir del tablero por sus propios medios.
+- Carros y troncos con velocidad y dirección por fila, anchos distintos y reaparición con retraso (pista circular).
+- Patrón inicial de cada fila definido a mano y validado al arrancar.
+- Reglas completas:
+  - carros que matan;
+  - río que hunde;
+  - troncos que transportan;
+  - muerte al ser arrastrada fuera del tablero;
+  - agujeros libres, ocupados y paredes de la meta.
+- Vidas, score (+100 por agujero) y estados `READY` → `PLAYING` → `WON` / `GAME_OVER`, con `R` para reiniciar.
 
-El canvas añade dos barras de HUD de `HUD_H = CELL` de alto: una **arriba** del tablero (score) y otra **abajo** (vidas y tiempo). Al dibujar, `Game.draw()` desplaza el tablero con `translate(0, HUD_H)`, de modo que la lógica sigue usando coordenadas del tablero (`y = 0` es la fila `HOME`); el HUD se dibuja sin desplazamiento.
+### ⏳ Falta para completar el primer nivel
 
-| Fila | Tipo | Contenido |
+En orden sugerido; los primeros son lógica pura y no dependen del aspecto visual.
+
+| # | Tarea | Notas |
 |---|---|---|
-| 0 | `HOME` | 4 agujeros (columnas 1, 4, 7, 10) |
-| 1–5 | `RIVER` | 5 filas de troncos, velocidades y direcciones distintas |
-| 6 | `SAFE` | Isla central |
-| 7–11 | `ROAD` | 5 filas de carros, velocidades y direcciones distintas |
-| 12 | `SAFE` | Zona de inicio (rana en columna 6, fila 12) |
+| 1 | `frameRate(60)` en `setup()` | **Importante.** Las velocidades están en píxeles por frame y p5 corre a la frecuencia del monitor: a 144 Hz el juego va ~2,4× más rápido. |
+| 2 | Temporizador por vida | ~30 s en el original. Al agotarse la rana muere. Se muestra en la barra inferior del HUD. |
+| 3 | Puntuación del original | 10 por cada fila nueva alcanzada (una vez por vida), 50 por agujero + bonus por tiempo restante, 1000 al llenar todos. |
+| 4 | HUD completo | Tiempo, y mensajes para `READY` / `WON` / `GAME_OVER`. Hoy solo muestra score y vidas. |
+| 5 | Pausa de muerte | Hoy la rana reaparece al instante. Congelar un momento, mostrar la muerte (atropellada / ahogada) y bloquear la entrada mientras dura. |
+| 6 | Tortugas que se hunden | Subclase de `Log` con un ciclo de inmersión; `carries()` devuelve `false` mientras está bajo el agua. Necesita un aviso visual antes de hundirse. |
+| 7 | Patrones del juego original | Ajustar `createLanes()` (velocidades, anchos, separaciones) al primer nivel del arcade. |
+| 8 | Texturas | Sprites para rana, carros (un tipo por carretera), troncos, tortugas, agua, césped y agujeros. |
+| 9 | Animaciones | Salto entre celdas, orientación de la rana según la dirección y animación de muerte. |
+| 10 | Vida extra | Al alcanzar cierto puntaje (20 000 en el original). |
 
-### 3.1 Filas en movimiento: velocidad y patrón (valores iniciales, ajustables)
+**Opcional / por decidir:**
 
-La velocidad y la dirección son de la **fila**: todos sus carros o troncos las comparten. El **ancho** es de cada entidad (troncos cortos y largos, carros y camiones). Cada fila se define a mano en `createLanes()` (`game.js`) con `(direction, speed, loopCells, pattern)`:
+- Peligros y bonus del original: serpiente, cocodrilos, mosca en un agujero, rana hembra.
+- Pasar al siguiente nivel al llenar los agujeros. Hoy `WON` termina la partida.
+- Sonido, pausa y récord persistente.
 
-- `speed`: píxeles por frame; `direction`: −1 (←) o +1 (→).
-- `loopCells`: longitud de la **pista circular** de la fila, en celdas. Las celdas 0–12 son visibles; las de 13 en adelante quedan fuera de pantalla. Una entidad que sale por un lado recorre ese tramo oculto antes de volver a entrar por el otro, lo que produce el retraso de reaparición del juego original. El retraso dura `(loopCells − 13 − w) × CELL / speed` frames, aproximadamente.
-- `pattern`: lista `[{ x, w }]` con la posición inicial y el ancho de cada entidad, en celdas sobre la pista (`x` ≥ 13 = empieza fuera de pantalla).
+## 3. Tablero
 
-Restricciones (las comprueba `Lane.validatePattern()` al crear la fila, y lanza un error que dice qué fila está mal):
+13 columnas × 13 filas, `CELL = 55px` → tablero de 715×715. El canvas mide 715×825 porque añade dos barras de HUD de `HUD_H = CELL`: una arriba y otra abajo.
 
-- `loopCells ≥ 13 + w` de la entidad más ancha; si no, al dar la vuelta aparecería de golpe dentro del tablero.
-- Las entidades no se solapan, tampoco a través del *wrap*.
+`Game.draw()` dibuja el tablero dentro de `translate(0, HUD_H)`. Así **toda la lógica usa coordenadas del tablero** (`y = 0` es la fila `HOME`), y solo el HUD usa coordenadas del canvas.
 
-| Fila | Tipo | `direction` | `speed` | `loopCells` | `pattern` (`x`/`w`) |
+| Fila | Tipo | Clase | Contenido |
+|---|---|---|---|
+| 0 | `HOME` | `HomeLane` | 4 agujeros (columnas 1, 4, 7, 10) |
+| 1–5 | `RIVER` | `RiverLane` | Troncos |
+| 6 | `SAFE` | `SafeLane` | Isla central |
+| 7–11 | `ROAD` | `RoadLane` | Carros |
+| 12 | `SAFE` | `SafeLane` | Inicio (rana en columna 6) |
+
+### 3.1 Filas en movimiento
+
+Cada fila se define en `createLanes()` (`game.js`) como `new RiverLane(direction, speed, loopCells, pattern)` o `new RoadLane(...)`:
+
+| Parámetro | Significado |
+|---|---|
+| `direction` | −1 (←) o +1 (→). Común a toda la fila. |
+| `speed` | Píxeles por frame. Común a toda la fila. |
+| `loopCells` | Longitud de la **pista circular** de la fila, en celdas. Las celdas 0–12 son visibles; el resto queda fuera de pantalla. |
+| `pattern` | `[{ x, w }]`: posición inicial y ancho de cada entidad, en celdas sobre la pista (`x ≥ 13` empieza fuera de pantalla). |
+
+Cuando una entidad sale por un lado, recorre el tramo oculto de la pista antes de volver a entrar por el otro. Ese recorrido produce el retraso de reaparición del juego original. Las entidades se crean una vez por partida y nunca se borran.
+
+`Lane.validatePattern()` hace fallar el juego al arrancar, con un mensaje que indica la fila, si:
+- `loopCells < 13 + w` de la entidad más ancha, porque esa entidad aparecería de golpe dentro del tablero;
+- dos entidades se solapan, también a través del *wrap*.
+
+Valores actuales (provisionales, ver tarea 7):
+
+| Fila | Tipo | Dir. | `speed` | `loopCells` | `pattern` (`x`/`w`) |
 |---|---|---|---|---|---|
 | 1 | `RIVER` | ← | 1.25 | 18 | 0/3 · 6/4 · 12/3 |
 | 2 | `RIVER` | → | 1.0 | 17 | 0/4 · 7/4 · 13/2 |
@@ -52,92 +88,73 @@ Restricciones (las comprueba `Lane.validatePattern()` al crear la fila, y lanza 
 | 5 | `RIVER` | ← | 1.25 | 18 | 2/4 · 9/4 |
 | 7 | `ROAD` | ← | 1.5 | 15 | 0/1 · 4/1 · 8/1 |
 | 8 | `ROAD` | → | 2.5 | 16 | 0/2 · 7/2 |
-| 9 | `ROAD` | ← | 2.0 | 17 | 0/3 · 8/3 (camiones) |
-| 10 | `ROAD` | → | 3.0 | 16 | 3/1 (un carro rápido) |
+| 9 | `ROAD` | ← | 2.0 | 17 | 0/3 · 8/3 |
+| 10 | `ROAD` | → | 3.0 | 16 | 3/1 |
 | 11 | `ROAD` | ← | 1.75 | 16 | 0/1 · 3/1 · 9/2 |
 
-Consecuencia para la rana: sobre un tronco se mueve a la velocidad de **ese** tronco (es decir, de su fila), así que cambia al saltar a otra fila del río (regla 3).
+## 4. Archivos y componentes
 
-## 4. Componentes
+Sin bundler (compatible con GitHub Pages). Los scripts se cargan en este orden en [`frogger/index.html`](../frogger/index.html), y el orden es obligatorio:
 
-| Componente | Responsabilidad | Archivo | Miembros clave |
-|---|---|---|---|
-| `Game` (orquestador) | Propietario del estado (vidas, score, estado); coordina cada frame y reacciona a lo que dicen las filas | `game.js` | `state`, `lives`, `score`, `frog`, `lanes[]`, `update()`, `draw()`, `drawBoard()`, `drawHUD()`, `checkCollisions()`, `loseLife()`, `respawnFrog()`, `reset()`, `handleKey()` |
-| `Frog` (jugador) | Saltos de una celda; arrastre por tronco; su caja de colisión | `frog.js` | `position`, `size`, `alive`, `ridingLog`, `move(direction)`, `update()`, `centerX()`, `row()`, `hitbox(margin)`, `draw()` |
-| `MovingEntity` (base) | Desplazamiento horizontal sobre una pista circular | `entities.js` | `position`, `entity_width`, `entity_height`, `speed`, `direction`, `loopLength`, `update()`, `keepInBounds()`, `bounds()`, `draw()` |
-| `Vehicle` | Carro (hereda de `MovingEntity`) | `entities.js` | `color`, `draw()` |
-| `Log` | Tronco (hereda de `MovingEntity`) | `entities.js` | `carries(frog)`, `draw()` |
-| `Lane` (interfaz base) | Contrato de toda fila: posee sus entidades, las crea, mueve y dibuja, y decide qué le pasa a la rana en ella | `lanes.js` | `type`, `row`, `entities[]`, `build(row)`, `update()`, `draw()`, `drawBackground()` (obligatorio), `checkFrog(frog)`, `buildPattern()`, `validatePattern()` |
-| `SafeLane` / `HomeLane` / `RoadLane` / `RiverLane` | Una clase por tipo de fila, heredan de `Lane` | `lanes.js` | Home: `holes[]`, `filled[]`, `holeAt(x)`, `allFilled()` · Road / River: `direction`, `speed`, `loopCells`, `pattern` |
-| Bootstrap p5 | `setup()`, `draw()`, `keyPressed()`, constantes de tablero | `frogger.js` | `CELL`, `COLS`, `ROWS`, `BOARD`, `HUD_H`, `game` |
+`p5.min.js` → `entities.js` → `frog.js` → `lanes.js` → `game.js` → `frogger.js`
 
-- `Lane.checkFrog(frog)` devuelve un `FROG_RESULT`: `OK`, `DIE` o `HOME`. `Game` solo reacciona (resta vida, suma puntos, cambia de estado); no sabe qué tipo de fila es cada una.
-- Helper de colisiones: `rectsOverlap(a, b)` (AABB) en `frog.js`, sobre cajas `{ x, y, w, h }` (`frog.hitbox()`, `entity.bounds()`).
-- **Convención de coordenadas:** todo (rana y entidades) vive en **píxeles del tablero** como `p5.Vector` (`position`, esquina superior izquierda). La rana salta exactamente `CELL` píxeles por tecla, de modo que al estar en tierra queda alineada a la celda; sobre un tronco su `position.x` puede quedar fuera de la rejilla. Su fila se obtiene con `frog.row()`.
-- Velocidades en **píxeles por frame**, dirección como vector unitario (`createVector(±1, 0)`).
+```
+frogger/
+├── index.html        # carga los scripts en el orden anterior
+├── entities.js       # MovingEntity (base), Vehicle, Log
+├── frog.js           # Frog, rectsOverlap()
+├── lanes.js          # Lane (interfaz base), SafeLane, HomeLane, RoadLane, RiverLane,
+│                     #   LANE_TYPES, FROG_RESULT
+├── game.js           # Game, createLanes() (definición de las 13 filas), GAME_STATES, HOME_POINTS
+├── frogger.js        # bootstrap de p5: constantes, setup(), draw(), keyPressed(). Sin lógica.
+└── libraries/p5.min.js
+```
+
+| Archivo | Responsabilidad |
+|---|---|
+| `entities.js` | Qué se mueve y cómo se pinta. No conoce las reglas. |
+| `frog.js` | El jugador: salto, arrastre por tronco, caja de colisión. |
+| `lanes.js` | Las reglas **de cada tipo de fila**: qué le pasa a la rana en carretera, río o meta. |
+| `game.js` | El estado de la partida (vidas, score, estado) y las reglas **comunes**. |
+| `frogger.js` | Conecta p5.js con `Game`. Define `CELL`, `COLS`, `ROWS`, `BOARD`, `HUD_H`. |
+
+Las constantes de `frogger.js` se cargan las últimas. Solo se pueden usar dentro de funciones que se ejecutan después de `setup()`, y por eso las filas se crean en `createLanes()` y no al cargar `game.js`.
 
 ## 5. Diagramas
 
-### 5.1 Componentes
+### 5.1 Clases
 
 ```mermaid
 classDiagram
+    direction LR
+
     class Game {
-        +state: string
-        +lives: int
-        +score: int
+        +state
+        +lives
+        +score
         +frog: Frog
         +lanes: Lane[]
         +update()
         +draw()
-        +reset()
         +checkCollisions()
         +loseLife()
         +respawnFrog()
+        +reset()
         +handleKey(key, keyCode)
     }
-    class Frog {
-        +position: Vector
-        +size: int
-        +alive: bool
-        +ridingLog: Log
-        +move(direction)
-        +update()
-        +centerX()
-        +row()
-        +hitbox(margin)
-        +draw()
-    }
-    class MovingEntity {
-        +position: Vector
-        +entity_width: int
-        +entity_height: int
-        +speed: float
-        +direction: Vector
-        +loopLength: float
-        +update()
-        +keepInBounds()
-        +bounds()
-        +draw()
-    }
-    class Vehicle {
-        +color
-        +draw()
-    }
-    class Log {
-        +carries(frog)
-        +draw()
-    }
+
     class Lane {
-        <<interface>>
-        +type: SAFE|ROAD|RIVER|HOME
-        +row: int
+        <<abstract>>
+        +type
+        +row
         +entities: MovingEntity[]
         +build(row)
         +update()
         +draw()
         +drawBackground()*
         +checkFrog(frog) FROG_RESULT
+        #buildPattern(loopCells, pattern, make)
+        #validatePattern(loopCells, pattern)
     }
     class SafeLane
     class HomeLane {
@@ -147,145 +164,136 @@ classDiagram
         +allFilled()
     }
     class RoadLane {
-        +direction: int
-        +speed: float
-        +loopCells: int
+        +direction
+        +speed
+        +loopCells
         +pattern
     }
     class RiverLane {
-        +direction: int
-        +speed: float
-        +loopCells: int
+        +direction
+        +speed
+        +loopCells
         +pattern
     }
-    Game *-- Frog
-    Game *-- Lane : lanes
+
+    class MovingEntity {
+        +position: Vector
+        +entity_width
+        +entity_height
+        +speed
+        +direction: Vector
+        +loopLength
+        +update()
+        +keepInBounds()
+        +bounds()
+        +draw()
+    }
+    class Vehicle {
+        +color
+    }
+    class Log {
+        +carries(frog)
+    }
+
+    class Frog {
+        +position: Vector
+        +size
+        +alive
+        +ridingLog: Log
+        +move(direction)
+        +update()
+        +centerX()
+        +row()
+        +hitbox(margin)
+    }
+
+    Game *-- "13" Lane
+    Game *-- "1" Frog
     Lane <|-- SafeLane
     Lane <|-- HomeLane
     Lane <|-- RoadLane
     Lane <|-- RiverLane
-    Lane *-- MovingEntity : entities
+    Lane *-- "0..*" MovingEntity
     MovingEntity <|-- Vehicle
     MovingEntity <|-- Log
     RoadLane ..> Vehicle : crea
     RiverLane ..> Log : crea
-    Frog ..> Log : "ridingLog"
+    Frog --> "0..1" Log : ridingLog
 ```
 
-### 5.2 Máquina de estados
+- `Lane` es la interfaz que ve `Game`. Cada subclase **posee** sus entidades (`entities`), las crea en `build()` y decide qué le pasa a la rana en `checkFrog()`.
+- `Game` no tiene listas de carros ni de troncos, y no pregunta de qué tipo es cada fila: recorre `lanes` y llama a los mismos métodos en todas.
+
+### 5.2 Estados
 
 ```mermaid
 stateDiagram-v2
     [*] --> READY
     READY --> PLAYING : cualquier tecla
-    PLAYING --> PLAYING : muerte con vidas restantes (lives--, rana reaparece)
-    PLAYING --> PLAYING : agujero libre alcanzado (score += 100, rana reaparece)
+    PLAYING --> PLAYING : muere con vidas restantes / llena un agujero
     PLAYING --> WON : 4 agujeros llenos
     PLAYING --> GAME_OVER : lives == 0
-    WON --> READY : tecla "R" (reinicia todo)
-    GAME_OVER --> READY : tecla "R" (reinicia todo)
+    WON --> READY : R
+    GAME_OVER --> READY : R
 ```
 
-### 5.3 Secuencia por frame (bucle de p5.js)
+### 5.3 Un frame
 
 ```mermaid
 sequenceDiagram
     participant P5 as p5 draw()
     participant G as Game
-    participant L as Lane (fila de la rana / todas)
+    participant L as Lane
     participant F as Frog
-    P5->>G: game.update()
-    G->>G: checkCollisions(): ¿rana fuera del tablero? → loseLife()
+
+    P5->>G: update()
+    Note over G: solo en PLAYING
+    G->>F: centerX() fuera del tablero? → loseLife()
     G->>L: lanes[frog.row()].checkFrog(frog)
-    L-->>G: OK / DIE / HOME (y fija frog.ridingLog si es río)
-    Note over G: DIE → loseLife()<br/>HOME → score, respawn o WON
-    G->>L: update() en todas las filas (entidades avanzan, wrap en su pista)
-    G->>F: update() (si ridingLog, la rana se desplaza con el tronco)
-    P5->>G: game.draw()
-    G->>L: draw() en todas (fondo + entidades)
+    L-->>G: OK / DIE / HOME
+    Note over G: DIE → loseLife()<br/>HOME → score, respawnFrog() o WON
+    G->>L: update() en las 13 filas
+    G->>F: update() (arrastre si ridingLog)
+
+    P5->>G: draw()
+    G->>L: draw() en las 13 filas (fondo + entidades)
     G->>F: draw()
     G->>G: drawHUD()
 ```
 
-## 6. Reglas del juego (evaluadas cada frame)
+Las reglas se aplican **antes** de mover. `checkFrog()` fija `frog.ridingLog`, y después la rana y su tronco se desplazan lo mismo en ese frame, así que siguen alineados.
 
-`Game.checkCollisions()` aplica las reglas comunes y le pregunta a la fila en la que está la rana (`Lane.checkFrog()`) por las demás:
+## 6. Reglas
 
-1. **Carretera** (`RoadLane`): la caja de la rana (`frog.hitbox()`, reducida 4 px por lado) se solapa con un `Vehicle` → muere.
-2. **Río** (`RiverLane`): el centro de la rana no está sobre ningún `Log` → muere (se hunde).
-3. **Río** (`RiverLane`): el centro de la rana está sobre un `Log` → `ridingLog` la transporta (hereda la velocidad y dirección de su fila).
-4. **Meta** (`HomeLane`): el centro de la rana cae en un agujero libre → se marca como lleno, +100 puntos y la rana reaparece.
-5. **Meta** (`HomeLane`): el centro cae fuera de un agujero, o en uno ya lleno → muere.
-6. **Común** (`Game`): el centro de la rana sale del tablero (arrastrada por un tronco) → muere. Toda muerte resta una vida y la rana reaparece en el inicio; con `lives == 0` → `GAME_OVER`.
-7. **Común** (`Game`): los 4 agujeros llenos → `WON`.
+| Dónde | Regla |
+|---|---|
+| `RoadLane.checkFrog` | La caja de la rana (`hitbox()`, 4 px más pequeña por lado) toca un carro → `DIE`. |
+| `RiverLane.checkFrog` | El centro de la rana está sobre un tronco → `OK` y `ridingLog` la arrastra. Si no → `DIE`. |
+| `HomeLane.checkFrog` | El centro cae en un agujero libre → `HOME` y el agujero queda lleno. Pared o agujero lleno → `DIE`. |
+| `Game.checkCollisions` | El centro de la rana sale del tablero (arrastrada por un tronco) → muere. |
+| `Game.checkCollisions` | `HOME` → +100 puntos; si los 4 agujeros están llenos → `WON`, si no la rana reaparece. |
+| `Game.loseLife` | Toda muerte resta una vida; con 0 → `GAME_OVER`, si no la rana reaparece en columna 6, fila 12. |
 
 ## 7. Entrada
 
-`keyPressed()` global → `game.handleKey(key, keyCode)`, que según el estado inicia la partida, reinicia o traduce flechas + WASD a un vector de `CELL` píxeles para `game.frog.move(direction)`. MVP: una celda por tecla, sin cooldown. En `READY` cualquier tecla inicia la partida; en `WON` / `GAME_OVER`, la tecla `R` reinicia.
+`keyPressed()` → `game.handleKey(key, keyCode)`:
 
-## 8. Estructura de archivos
+| Estado | Tecla | Efecto |
+|---|---|---|
+| `READY` | cualquiera | Empieza la partida (no mueve la rana). |
+| `PLAYING` | flechas / WASD | Salto de una celda. |
+| `WON` / `GAME_OVER` | `R` | Partida nueva. |
 
-El código se divide en 5 archivos JS + 2 HTML, sin bundler (compatible con GitHub Pages):
+## 8. Decisiones de diseño
 
-```
-Frogger-Visual_Computing_2026-II/
-├── index.html            # landing page: enlaces al juego y a la documentación
-├── README.md
-├── docs/
-│   └── ARQUITECTURA.md
-└── frogger/
-    ├── index.html        # carga los scripts en orden: p5 → entities → frog → lanes → game → frogger
-    ├── frogger.js        # BOOTSTRAP p5: constantes (CELL, COLS, ROWS, BOARD, HUD_H), setup(),
-    │                     #   draw(), keyPressed() y la variable global `game`. SIN lógica.
-    ├── entities.js       # MovingEntity (base, pista circular), Vehicle, Log.
-    ├── frog.js           # Frog (jugador) y rectsOverlap().
-    ├── lanes.js          # Lane (interfaz base), SafeLane, HomeLane, RoadLane, RiverLane,
-    │                     #   LANE_TYPES, FROG_RESULT.
-    ├── game.js           # Game (orquestador), createLanes() (definición de las 13 filas),
-    │                     #   GAME_STATES, HOME_POINTS.
-    └── libraries/
-        └── p5.min.js     # p5.js local (sin CDN)
-```
-
-**Orden de carga (obligatorio, ver [`frogger/index.html`](../frogger/index.html)):**
-`libraries/p5.min.js` → `entities.js` → `frog.js` → `lanes.js` → `game.js` → `frogger.js`.
-La dependencia es lineal: `entities` y `frog` no dependen de nadie; `lanes` usa `entities` y `frog`; `game` usa `frog` y `lanes`;
-`frogger` (bootstrap) instancia `Game` de `game.js`. Las constantes de `frogger.js` (`CELL`, `BOARD`…) solo se usan en tiempo de ejecución, por eso las filas se crean dentro de `createLanes()` y no al cargar `game.js`.
-
-**Regla de responsabilidad:** `frogger.js` solo interconecta p5.js con la lógica
-(ninguna regla de juego); `game.js` contiene el estado de la partida y las reglas comunes; `lanes.js` las reglas
-de cada tipo de fila; `frog.js` el jugador; `entities.js` solo define qué se mueve y cómo se pinta.
-
-## 9. Decisiones de diseño y casos borde
-
-| Tema | Decisión |
-|---|---|
-| Quién posee las entidades | Cada fila (`Lane.entities`). `Game` no tiene listas de carros ni troncos ni usa `instanceof`: recorre las filas y llama a los mismos métodos (polimorfismo). |
-| Reaparición de entidades | Pista circular por fila (`loopCells`), con un tramo fuera de pantalla. Las entidades se crean una vez por partida y nunca se borran; el retraso de reentrada sale solo de la longitud de la pista. Se descartó un *spawner* (crear/borrar en el borde) por ser más complejo para el mismo resultado. |
-| Patrón de cada fila | Definido a mano (`pattern` en celdas), no generado: es determinista y fácil de afinar jugando. Validado al crear la fila. |
-| Entidades de distinto ancho | El ancho es por entidad; velocidad y dirección por fila. `loopCells` debe dejar sitio a la más ancha. |
-| Colisión con carros | AABB con la caja de la rana reducida 4 px por lado (`frog.hitbox()`): rozar un carro con el borde no mata. |
-| Colisión con troncos | Por el **centro** de la rana (`Log.carries()`), no por solape: tocar un tronco solo con la esquina no basta para subirse. |
-| Agujeros | Por el centro de la rana (`HomeLane.holeAt()`), porque puede llegar desalineada desde un tronco. |
-| Rana arrastrada fuera del tablero | Muere cuando su centro sale del tablero. El arrastre **no** usa `move()` (que bloquea en los bordes), sino un desplazamiento directo de `position`. |
-| Orden dentro del frame | Primero reglas (fijan `ridingLog`), luego movimiento. La rana y su tronco se desplazan lo mismo en el frame, así que siguen alineados. |
-| Timestep | Velocidades en píxeles por frame (60 FPS fijos de p5). Sin `deltaTime` en el MVP; el juego depende del framerate y se asume. |
-| `Frog` en `frog.js` | Archivo propio: contiene lógica del jugador (arrastre, estado `alive`) y no es una entidad que se mueve sola, por eso no va en `entities.js`. |
-| Reaparición de la rana | Columna 6, fila 12, `ridingLog = null`, `alive = true`. |
-
-## 10. Avance de implementación
-
-**Hecho:**
-
-- [x] `MovingEntity`, `Vehicle`, `Log` con pista circular (`loopLength`).
-- [x] `Frog` con movimiento por teclas (flechas + WASD), arrastre directo por tronco y caja de colisión reducida.
-- [x] `Game` como orquestador, con estados `READY` / `PLAYING` / `WON` / `GAME_OVER`, vidas, score y reaparición.
-- [x] Filas polimórficas en `lanes.js` que poseen sus entidades; 13 filas definidas a mano con patrón validado.
-- [x] Reglas 1–7 (carros, río, troncos, agujeros, salida del tablero, vidas, victoria).
-- [x] Tablero de 715×715, canvas de 715×825 con las dos barras de HUD (score, vidas).
-
-**Pendiente:**
-
-1. HUD: tiempo y mensajes de estado (`READY`, `WON`, `GAME_OVER`) en `drawHUD()`.
-2. Afinar velocidades y patrones jugando.
-3. Colores por fila o por tipo de vehículo (hoy todos los carros son rojos).
+| Tema | Decisión | Por qué |
+|---|---|---|
+| Coordenadas | Todo en píxeles del tablero con `p5.Vector`; la rana salta `CELL` px. | Rana y entidades comparten sistema; no hay conversión grid ↔ píxel al ir sobre un tronco. |
+| Quién posee las entidades | Cada fila. | Polimorfismo: `Game` no necesita `instanceof` ni saber qué tipo de fila es. |
+| Reaparición de entidades | Pista circular por fila con tramo oculto. | Mismo efecto que crear/borrar en el borde, pero sin listas que crecen y con un patrón determinista. |
+| Patrones | A mano, en celdas, validados al arrancar. | Fácil de leer y de afinar jugando; un error de patrón se detecta enseguida. |
+| Velocidad y ancho | Velocidad y dirección por fila, ancho por entidad. | Como en el original: troncos largos y cortos en la misma fila del río. |
+| Colisión con carros | AABB con la caja de la rana reducida 4 px. | Rozar un carro con el borde no se siente como un choque. |
+| Colisión con troncos y agujeros | Por el centro de la rana. | Tocar con una esquina no basta, y la rana puede llegar desalineada desde un tronco. |
+| Arrastre | Suma directa a `position`, sin `move()`. | `move()` bloquea en los bordes y dejaría la rana desincronizada del tronco. |
+| Timestep | Píxeles por frame, sin `deltaTime`. | Simple para el MVP; exige fijar `frameRate(60)` (ver tarea 1). |

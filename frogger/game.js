@@ -1,15 +1,15 @@
-// LÓGICA DEL JUEGO: estados, filas, orquestador (Game), jugador (Frog) y colisiones.
-// Usa las filas de lanes.js, la rana de frog.js y las constantes de frogger.js (CELL, BOARD, HUD_H).
+// Estado de la partida (vidas, score, estado), definición del tablero y reglas comunes.
+// Las reglas de cada tipo de fila (carros, río, agujeros) están en lanes.js.
 
 const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
 
-// Una fila por entrada, de arriba a abajo (13 en total). Cada una es un objeto de lanes.js.
+// Las 13 filas del tablero, de arriba (0) a abajo (12).
 // RoadLane / RiverLane: (direction, speed, loopCells, pattern)
-//   direction: -1 (←) o 1 (→) · speed: píxeles por frame (docs/ARQUITECTURA.md §3.1)
+//   direction: -1 (←) o 1 (→) · speed: píxeles por frame
 //   loopCells: longitud de la pista circular en celdas (13 visibles + el resto fuera de pantalla)
 //   pattern:   [{ x, w }] posición inicial y ancho de cada carro / tronco, en celdas
-// Es una función porque las filas usan CELL / BOARD, que frogger.js define después de cargar
-// este archivo: se instancian en el constructor de Game, ya con todo cargado.
+// Es una función y no una constante porque las filas usan CELL / BOARD, que frogger.js
+// define después de cargar este archivo.
 const createLanes = () => [
   new HomeLane([1, 4, 7, 10]),                                                    // 0
   new RiverLane(-1, 1.25, 18, [{ x: 0, w: 3 }, { x: 6, w: 4 }, { x: 12, w: 3 }]), // 1
@@ -29,7 +29,6 @@ const createLanes = () => [
 const HOME_POINTS = 100   // puntos por llenar un agujero
 
 
-// Orquestador: es dueño del estado y coordina cada frame (lo llama frogger.js).
 class Game {
   constructor() {
     this.state = GAME_STATES.READY
@@ -40,9 +39,8 @@ class Game {
     this.reset()
   }
 
-  // Un frame de lógica. Orden según docs/ARQUITECTURA.md §5.3:
-  // primero se aplican las reglas (fija frog.ridingLog), luego se mueve todo. La rana y su
-  // tronco se desplazan lo mismo en este frame, así que siguen alineados.
+  // Primero las reglas (fijan frog.ridingLog) y luego el movimiento: así la rana y su
+  // tronco se desplazan lo mismo en el frame y siguen alineados.
   update() {
     if (this.state != GAME_STATES.PLAYING)
       return
@@ -57,32 +55,27 @@ class Game {
     this.frog.update()
   }
 
-  // Un frame de dibujo: fondo, entidades, rana y HUD (en ese orden, de atrás hacia adelante).
   draw() {
     background(0)
 
-    // El tablero se dibuja desplazado hacia abajo para dejar libre la barra superior del HUD.
-    // Así toda la lógica sigue usando coordenadas del tablero (y = 0 es la fila HOME).
+    // El tablero se desplaza para dejar sitio a la barra superior del HUD; así la lógica
+    // sigue usando coordenadas del tablero (y = 0 es la fila HOME).
     push()
     translate(0, HUD_H)
     this.drawBoard()
     this.frog.draw()
     pop()
 
-    // El HUD usa coordenadas del canvas (sin desplazamiento)
     this.drawHUD()
   }
 
-  // Cada fila dibuja su fondo y sus entidades (polimorfismo: ver lanes.js)
   drawBoard() {
     for (const lane of this.lanes)
       lane.draw()
   }
 
-  // Barra superior: score. Barra inferior: vidas y tiempo.
-  // TODO: mostrar el tiempo en la barra inferior (a la derecha).
-  // TODO: si el estado es READY / WON / GAME_OVER, mostrar además un mensaje
-  //   ("pulsa una tecla", "ganaste", "pulsa R").
+  // Barra superior: score. Barra inferior: vidas (y tiempo, pendiente).
+  // TODO: tiempo en la barra inferior y mensajes para READY / WON / GAME_OVER.
   drawHUD() {
     const topY = 0
     const bottomY = HUD_H + BOARD
@@ -102,21 +95,19 @@ class Game {
     pop()
   }
 
-  // Reglas de docs/ARQUITECTURA.md §6. Se llama una vez por frame desde update().
-  // Las reglas de cada tipo de fila (carros, río, agujeros) viven en Lane.checkFrog();
-  // aquí solo se aplican las comunes y se reacciona al resultado.
+  // Aplica las reglas comunes y pregunta a la fila de la rana (Lane.checkFrog) por las suyas.
   checkCollisions() {
     if (!this.frog.alive)
       return
 
-    // Fuera del tablero (solo puede pasar arrastrada por un tronco) -> muere
+    // Solo puede salir del tablero arrastrada por un tronco
     const centerX = this.frog.centerX()
     if (centerX < 0 || centerX > BOARD) {
       this.loseLife()
       return
     }
 
-    // Solo la fila en la que está la rana decide; fuera del río no va sobre ningún tronco
+    // Fuera del río no va sobre ningún tronco; RiverLane lo vuelve a fijar si toca
     const lane = this.lanes[this.frog.row()]
     this.frog.ridingLog = null
     const result = lane.checkFrog(this.frog)
@@ -126,13 +117,13 @@ class Game {
     } else if (result == FROG_RESULT.HOME) {
       this.score += HOME_POINTS
       if (lane.allFilled())
-        this.state = GAME_STATES.WON   // regla 7
+        this.state = GAME_STATES.WON
       else
         this.respawnFrog()
     }
   }
 
-  // Regla 6: toda muerte resta una vida; con 0 vidas GAME_OVER, si no la rana reaparece.
+  // Con 0 vidas termina la partida; si no, la rana vuelve al inicio.
   loseLife() {
     this.lives--
     if (this.lives <= 0) {
@@ -143,13 +134,12 @@ class Game {
     }
   }
 
-  // Coloca una rana nueva en el inicio (columna 6, fila 12), viva y sin tronco.
+  // Rana nueva en el inicio (columna 6, fila 12)
   respawnFrog() {
     this.frog = new Frog(createVector(CELL * 6, CELL * 12), CELL)
   }
 
-  // Reinicia toda la partida (también se usa al construir el juego): cada fila recrea
-  // sus entidades en su posición inicial y vacía sus agujeros.
+  // Partida nueva: cada fila recrea sus entidades en su posición inicial y vacía sus agujeros.
   reset() {
     this.state = GAME_STATES.READY
     this.lives = 3
@@ -159,8 +149,7 @@ class Game {
     this.respawnFrog()
   }
 
-  // Entrada de teclado; la llama keyPressed() de frogger.js.
-  // READY -> PLAYING con cualquier tecla; WON / GAME_OVER -> reset con 'R'.
+  // READY: cualquier tecla empieza. WON / GAME_OVER: 'R' reinicia. PLAYING: flechas o WASD.
   handleKey(key, keyCode) {
     if (this.state == GAME_STATES.READY) {
       this.state = GAME_STATES.PLAYING
@@ -173,7 +162,6 @@ class Game {
       return
     }
 
-    // Playing
     if (this.state == GAME_STATES.PLAYING) {
       let direction = createVector(0, 0)
 
