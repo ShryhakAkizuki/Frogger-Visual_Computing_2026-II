@@ -1,15 +1,12 @@
 // Filas del tablero. Cada tipo de fila posee sus entidades, las mueve, las dibuja y decide
 // qué le pasa a la rana cuando está en ella. Game trata a todas por igual a través de Lane.
 
-const LANE_TYPES = { SAFE: 0, ROAD: 1, RIVER: 2, HOME: 3 }
-
 // Lo que devuelve Lane.checkFrog() para que Game reaccione
-const FROG_RESULT = { OK: 'OK', DIE: 'DIE', HOME: 'HOME' }
+const FROG_RESULT = { OK: 'OK', DIE: 'DIE', HOME: 'HOME', WIN: 'WIN' }
 
 // Interfaz base de todas las filas
 class Lane {
-  constructor(type) {
-    this.type = type
+  constructor() {
     this.row = 0
     this.entities = []
   }
@@ -39,6 +36,12 @@ class Lane {
   // Por defecto la fila es segura
   checkFrog(frog) {
     return FROG_RESULT.OK
+  }
+
+  // Entidad de esta fila sobre la que va la rana, o null si ninguna. Consulta pura:
+  // no modifica a la rana; Game guarda la respuesta en frog.ridingLog (único escritor).
+  rideFor(frog) {
+    return null
   }
 
   fillRow(c) {
@@ -84,7 +87,7 @@ class Lane {
 
 class SafeLane extends Lane {
   constructor() {
-    super(LANE_TYPES.SAFE)
+    super()
   }
 
   drawBackground() {
@@ -96,7 +99,7 @@ class SafeLane extends Lane {
 class HomeLane extends Lane {
   // holes: columnas de los agujeros, p. ej. [1, 4, 7, 10]
   constructor(holes) {
-    super(LANE_TYPES.HOME)
+    super()
     this.holes = holes
     this.filled = holes.map(() => false)
   }
@@ -114,15 +117,15 @@ class HomeLane extends Lane {
     }
   }
 
-  // Agujero libre -> HOME; pared o agujero ocupado -> DIE. Se usa el centro de la rana
-  // porque puede llegar desalineada desde un tronco.
+  // Agujero libre -> HOME, o WIN si con este se llena el último. Pared o agujero
+  // ocupado -> DIE. Se usa el centro de la rana porque puede llegar desalineada desde un tronco.
   checkFrog(frog) {
     const hole = this.holeAt(frog.centerX())
     if (hole == -1 || this.filled[hole])
       return FROG_RESULT.DIE
 
     this.filled[hole] = true
-    return FROG_RESULT.HOME
+    return this.allFilled() ? FROG_RESULT.WIN : FROG_RESULT.HOME
   }
 
   allFilled() {
@@ -139,7 +142,7 @@ class HomeLane extends Lane {
 class RoadLane extends Lane {
   // loopCells y pattern: ver Lane.buildPattern()
   constructor(direction, speed, loopCells, pattern, vehicleColor = "#FF0000") {
-    super(LANE_TYPES.ROAD)
+    super()
     this.direction = direction
     this.speed = speed
     this.loopCells = loopCells
@@ -172,7 +175,7 @@ class RoadLane extends Lane {
 class RiverLane extends Lane {
   // loopCells y pattern: ver Lane.buildPattern()
   constructor(direction, speed, loopCells, pattern) {
-    super(LANE_TYPES.RIVER)
+    super()
     this.direction = direction
     this.speed = speed
     this.loopCells = loopCells
@@ -189,9 +192,13 @@ class RiverLane extends Lane {
     this.fillRow("blue")
   }
 
+  // El tronco bajo la rana, o null
+  rideFor(frog) {
+    return this.entities.find(log => log.carries(frog)) || null
+  }
+
   // Sobre un tronco viaja con él; en el agua se hunde
   checkFrog(frog) {
-    frog.ridingLog = this.entities.find(log => log.carries(frog)) || null
-    return frog.ridingLog ? FROG_RESULT.OK : FROG_RESULT.DIE
+    return this.rideFor(frog) ? FROG_RESULT.OK : FROG_RESULT.DIE
   }
 }

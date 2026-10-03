@@ -1,4 +1,4 @@
-# Frogger — Arquitectura
+`# Frogger — Arquitectura
 
 > Guía para el equipo de desarrollo · Proyecto de curso: Visual Computing (2026-II).
 > Stack: JavaScript (ES6+) + p5.js (local, sin CDN) · Despliegue: GitHub Pages.
@@ -35,7 +35,7 @@ En orden sugerido; los primeros son lógica pura y no dependen del aspecto visua
 | 4 | HUD completo | Tiempo, y mensajes para `READY` / `WON` / `GAME_OVER`. Hoy solo muestra score y vidas. |
 | 5 | Pausa de muerte | Hoy la rana reaparece al instante. Congelar un momento, mostrar la muerte (atropellada / ahogada) y bloquear la entrada mientras dura. |
 | 6 | Tortugas que se hunden | Subclase de `Log` con un ciclo de inmersión; `carries()` devuelve `false` mientras está bajo el agua. Necesita un aviso visual antes de hundirse. |
-| 7 | Patrones del juego original | Ajustar `createLanes()` (velocidades, anchos, separaciones) al primer nivel del arcade. |
+| 7 | Patrones del juego original | Ajustar `LANES` (velocidades, anchos, separaciones) al primer nivel del arcade. |
 | 8 | Texturas | Sprites para rana, carros (un tipo por carretera), troncos, tortugas, agua, césped y agujeros. |
 | 9 | Animaciones | Salto entre celdas, orientación de la rana según la dirección y animación de muerte. |
 | 10 | Vida extra | Al alcanzar cierto puntaje (20 000 en el original). |
@@ -62,7 +62,7 @@ En orden sugerido; los primeros son lógica pura y no dependen del aspecto visua
 
 ### 3.1 Filas en movimiento
 
-Cada fila se define en `createLanes()` (`game.js`) como `new RiverLane(direction, speed, loopCells, pattern)` o `new RoadLane(...)`:
+Cada fila se define en la constante `LANES` (`game.js`) como `new RiverLane(direction, speed, loopCells, pattern)` o `new RoadLane(...)`:
 
 | Parámetro | Significado |
 |---|---|
@@ -96,29 +96,31 @@ Valores actuales (provisionales, ver tarea 7):
 
 Sin bundler (compatible con GitHub Pages). Los scripts se cargan en este orden en [`frogger/index.html`](../frogger/index.html), y el orden es obligatorio:
 
-`p5.min.js` → `entities.js` → `frog.js` → `lanes.js` → `game.js` → `frogger.js`
+`p5.min.js` → `constants.js` → `entities.js` → `frog.js` → `lanes.js` → `game.js` → `frogger.js`
 
 ```
 frogger/
 ├── index.html        # carga los scripts en el orden anterior
+├── constants.js      # CELL, COLS, ROWS, BOARD, HUD_H (compartidas por todo el juego)
 ├── entities.js       # MovingEntity (base), Vehicle, Log
 ├── frog.js           # Frog, rectsOverlap()
 ├── lanes.js          # Lane (interfaz base), SafeLane, HomeLane, RoadLane, RiverLane,
-│                     #   LANE_TYPES, FROG_RESULT
-├── game.js           # Game, createLanes() (definición de las 13 filas), GAME_STATES, HOME_POINTS
-├── frogger.js        # bootstrap de p5: constantes, setup(), draw(), keyPressed(). Sin lógica.
+│                     #   FROG_RESULT
+├── game.js           # Game, LANES (definición de las 13 filas), GAME_STATES, INPUT, HOME_POINTS
+├── frogger.js        # bootstrap de p5: setup(), draw(), keyPressed() y traducción de teclas. Sin lógica.
 └── libraries/p5.min.js
 ```
 
 | Archivo | Responsabilidad |
 |---|---|
+| `constants.js` | `CELL`, `COLS`, `ROWS`, `BOARD`, `HUD_H`. Sin lógica. |
 | `entities.js` | Qué se mueve y cómo se pinta. No conoce las reglas. |
 | `frog.js` | El jugador: salto, arrastre por tronco, caja de colisión. |
 | `lanes.js` | Las reglas **de cada tipo de fila**: qué le pasa a la rana en carretera, río o meta. |
-| `game.js` | El estado de la partida (vidas, score, estado) y las reglas **comunes**. |
-| `frogger.js` | Conecta p5.js con `Game`. Define `CELL`, `COLS`, `ROWS`, `BOARD`, `HUD_H`. |
+| `game.js` | El estado de la partida (vidas, score, estado), la máquina de estados de entrada y las reglas **comunes**. |
+| `frogger.js` | Conecta p5.js con `Game`: traduce cada tecla a un `INPUT` neutro. |
 
-Las constantes de `frogger.js` se cargan las últimas. Solo se pueden usar dentro de funciones que se ejecutan después de `setup()`, y por eso las filas se crean en `createLanes()` y no al cargar `game.js`.
+Las constantes de `constants.js` se cargan primero (tras `p5.min.js`), así que todos los scripts pueden usarlas al cargar y las filas se crean directamente al cargar `game.js` (constante `LANES`).
 
 ## 5. Diagramas
 
@@ -140,12 +142,12 @@ classDiagram
         +loseLife()
         +respawnFrog()
         +reset()
-        +handleKey(key, keyCode)
+        +handleInput(input)
+        +setState(next)
     }
 
     class Lane {
         <<abstract>>
-        +type
         +row
         +entities: MovingEntity[]
         +build(row)
@@ -153,6 +155,7 @@ classDiagram
         +draw()
         +drawBackground()*
         +checkFrog(frog) FROG_RESULT
+        +rideFor(frog) Log o null
         #buildPattern(loopCells, pattern, make)
         #validatePattern(loopCells, pattern)
     }
@@ -249,9 +252,11 @@ sequenceDiagram
     P5->>G: update()
     Note over G: solo en PLAYING
     G->>F: centerX() fuera del tablero? → loseLife()
+    G->>L: lanes[frog.row()].rideFor(frog)
+    Note over G: frog.ridingLog = resultado (único escritor)
     G->>L: lanes[frog.row()].checkFrog(frog)
-    L-->>G: OK / DIE / HOME
-    Note over G: DIE → loseLife()<br/>HOME → score, respawnFrog() o WON
+    L-->>G: OK / DIE / HOME / WIN
+    Note over G: DIE → loseLife()<br/>HOME → +score, respawnFrog()<br/>WIN → +score, estado WON
     G->>L: update() en las 13 filas
     G->>F: update() (arrastre si ridingLog)
 
@@ -261,28 +266,35 @@ sequenceDiagram
     G->>G: drawHUD()
 ```
 
-Las reglas se aplican **antes** de mover. `checkFrog()` fija `frog.ridingLog`, y después la rana y su tronco se desplazan lo mismo en ese frame, así que siguen alineados.
+Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ridingLog` consultando `Lane.rideFor()` (único escritor: las filas no mutan a la rana), y después la rana y su tronco se desplazan lo mismo en ese frame, así que siguen alineados. El orden `checkCollisions()` → `lanes.update()` → `frog.update()` es exigido: `frog.update()` lee el `ridingLog` que acaba de fijar `checkCollisions()`.
 
 ## 6. Reglas
 
 | Dónde | Regla |
 |---|---|
 | `RoadLane.checkFrog` | La caja de la rana (`hitbox()`, 4 px más pequeña por lado) toca un carro → `DIE`. |
-| `RiverLane.checkFrog` | El centro de la rana está sobre un tronco → `OK` y `ridingLog` la arrastra. Si no → `DIE`. |
-| `HomeLane.checkFrog` | El centro cae en un agujero libre → `HOME` y el agujero queda lleno. Pared o agujero lleno → `DIE`. |
+| `RiverLane.rideFor` | El centro de la rana está sobre un tronco → lo devuelve; si no, `null`. `Game` lo guarda en `frog.ridingLog` (único escritor) y el tronco la arrastra. |
+| `RiverLane.checkFrog` | Hay tronco bajo la rana → `OK`; si no → `DIE`. |
+| `HomeLane.checkFrog` | El centro cae en un agujero libre → el agujero queda lleno y devuelve `HOME`, o `WIN` si con ese se llena el último. Pared o agujero lleno → `DIE`. |
 | `Game.checkCollisions` | El centro de la rana sale del tablero (arrastrada por un tronco) → muere. |
-| `Game.checkCollisions` | `HOME` → +100 puntos; si los 4 agujeros están llenos → `WON`, si no la rana reaparece. |
+| `Game.checkCollisions` | `HOME` → +100 puntos y la rana reaparece. `WIN` → +100 puntos y estado `WON` (la rana no reaparece). |
 | `Game.loseLife` | Toda muerte resta una vida; con 0 → `GAME_OVER`, si no la rana reaparece en columna 6, fila 12. |
 
 ## 7. Entrada
 
-`keyPressed()` → `game.handleKey(key, keyCode)`:
+`keyPressed()` (en `frogger.js`) traduce `key`/`keyCode` — los únicos globals de p5 que toca el proyecto — a un `INPUT` neutro y llama a `game.handleInput(input)`, que es la **máquina de estados de entrada**: cada estado decide qué hacer con el comando, y `Game.setState()` es el único punto donde cambia el estado de la partida.
 
-| Estado | Tecla | Efecto |
+| `INPUT` | Origen (tecla) |
+|---|---|
+| `UP` / `DOWN` / `LEFT` / `RIGHT` | flechas / WASD |
+| `RESTART` | `R` |
+| `OTHER` | cualquier otra tecla |
+
+| Estado | INPUT | Efecto |
 |---|---|---|
 | `READY` | cualquiera | Empieza la partida (no mueve la rana). |
-| `PLAYING` | flechas / WASD | Salto de una celda. |
-| `WON` / `GAME_OVER` | `R` | Partida nueva. |
+| `PLAYING` | `UP` / `DOWN` / `LEFT` / `RIGHT` | Salto de una celda. |
+| `WON` / `GAME_OVER` | `RESTART` | Partida nueva. |
 
 ## 8. Decisiones de diseño
 
@@ -297,3 +309,7 @@ Las reglas se aplican **antes** de mover. `checkFrog()` fija `frog.ridingLog`, y
 | Colisión con troncos y agujeros | Por el centro de la rana. | Tocar con una esquina no basta, y la rana puede llegar desalineada desde un tronco. |
 | Arrastre | Suma directa a `position`, sin `move()`. | `move()` bloquea en los bordes y dejaría la rana desincronizada del tronco. |
 | Timestep | Píxeles por frame, sin `deltaTime`. | Simple para el MVP; exige fijar `frameRate(60)` (ver tarea 1). |
+| Quién decide la victoria | `HomeLane`: devuelve `WIN` al llenar el último agujero; `Game` solo reacciona a `FROG_RESULT`. | `Game` no conoce los agujeros, y el enum `OK / DIE / HOME / WIN` cierra el contrato: ninguna otra fila puede devolver un resultado que `Game` no sepa manejar. |
+| Entrada | `frogger.js` traduce `key`/`keyCode` de p5 a un `INPUT` neutro; `Game.handleInput()` es la máquina de estados y `setState()` el único cambio de estado. `Frog.move()` recibe la dirección en celdas, sin p5. | El núcleo del juego no conoce los globals de p5, y las transiciones `READY` / `PLAYING` / `WON` / `GAME_OVER` se auditan en un solo sitio. |
+| `ridingLog` | `Game.checkCollisions()` es el único escritor: pregunta `Lane.rideFor()` (consulta pura) y guarda el resultado; `Frog` solo lo lee. | Las filas no mutan a la rana y la corrección (arrastre) no depende del orden de las llamadas. |
+| Constantes | `constants.js` se carga primero, tras `p5.min.js`. | Todos los scripts pueden usar `CELL` / `BOARD` / ... al cargar; no hay dependencia inversa con el último script. |

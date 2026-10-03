@@ -4,21 +4,24 @@ class Frog {
     this.position = position
     this.size = size
     this.alive = true
-    this.ridingLog = null   // tronco sobre el que va; lo fija RiverLane.checkFrog()
+    this.ridingLog = null   // tronco sobre el que va; lo fija Game.checkCollisions() con Lane.rideFor()
   }
 
-  // Salto de `direction` píxeles; se ignora si saldría del tablero o la rana está muerta
+  // Salto de `direction` celdas ({ x, y } con -1, 0 o 1); se ignora si saldría del
+  // tablero o la rana está muerta
   move(direction) {
-    let next_position = p5.Vector.add(this.position, direction)
+    const next_x = this.position.x + direction.x * this.size
+    const next_y = this.position.y + direction.y * this.size
 
-    if (next_position.x > BOARD - this.size || next_position.x < 0 ||
-      next_position.y > BOARD - this.size || next_position.y < 0)
+    if (next_x > BOARD - this.size || next_x < 0 ||
+      next_y > BOARD - this.size || next_y < 0)
       return
 
     if (this.alive != true)
       return
 
-    this.position = next_position
+    this.position.x = next_x
+    this.position.y = next_y
   }
 
   // Arrastre por el tronco: suma directamente su velocidad (sin pasar por move(), que se

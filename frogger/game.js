@@ -1,16 +1,34 @@
-// Estado de la partida (vidas, score, estado), definición del tablero y reglas comunes.
+// El estado de la partida (vidas, score, estado), la definición del tablero, la máquina
+// de estados de entrada y las reglas comunes.
 // Las reglas de cada tipo de fila (carros, río, agujeros) están en lanes.js.
 
 const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
+
+// Comandos de entrada neutros: el juego no conoce key/keyCode de p5. frogger.js (el único
+// archivo que toca p5) traduce cada tecla pulsada a uno de estos.
+const INPUT = {
+  UP: 'UP',
+  DOWN: 'DOWN',
+  LEFT: 'LEFT',
+  RIGHT: 'RIGHT',
+  RESTART: 'RESTART',
+  OTHER: 'OTHER',   // tecla que no es de movimiento ni de reinicio
+}
+
+// Dirección (en celdas) de cada comando de movimiento; los demás no mueven a la rana.
+const DIRECTIONS = {
+  [INPUT.UP]: { x: 0, y: -1 },
+  [INPUT.DOWN]: { x: 0, y: 1 },
+  [INPUT.LEFT]: { x: -1, y: 0 },
+  [INPUT.RIGHT]: { x: 1, y: 0 },
+}
 
 // Las 13 filas del tablero, de arriba (0) a abajo (12).
 // RoadLane / RiverLane: (direction, speed, loopCells, pattern)
 //   direction: -1 (←) o 1 (→) · speed: píxeles por frame
 //   loopCells: longitud de la pista circular en celdas (13 visibles + el resto fuera de pantalla)
 //   pattern:   [{ x, w }] posición inicial y ancho de cada carro / tronco, en celdas
-// Es una función y no una constante porque las filas usan CELL / BOARD, que frogger.js
-// define después de cargar este archivo.
-const createLanes = () => [
+const LANES = [
   new HomeLane([1, 4, 7, 10]),                                                    // 0
   new RiverLane(-1, 1.25, 18, [{ x: 0, w: 3 }, { x: 6, w: 4 }, { x: 12, w: 3 }]), // 1
   new RiverLane( 1, 1.0,  17, [{ x: 0, w: 4 }, { x: 7, w: 4 }, { x: 13, w: 2 }]), // 2
@@ -35,12 +53,34 @@ class Game {
     this.lives = 3
     this.score = 0
     this.frog = null
-    this.lanes = createLanes()
+    this.lanes = LANES
     this.reset()
   }
 
+  // Único punto donde cambia el estado de la partida.
+  setState(next) {
+    this.state = next
+  }
+
+  // Máquina de estados de entrada: decide qué hacer con un INPUT según el estado actual.
+  // READY: cualquier comando empieza (sin mover). WON / GAME_OVER: RESTART reinicia.
+  // PLAYING: los comandos de movimiento mueven a la rana.
+  handleInput(input) {
+    if (this.state == GAME_STATES.READY) {
+      this.setState(GAME_STATES.PLAYING)
+    } else if (this.state == GAME_STATES.WON || this.state == GAME_STATES.GAME_OVER) {
+      if (input == INPUT.RESTART)
+        this.reset()
+    } else if (this.state == GAME_STATES.PLAYING) {
+      const direction = DIRECTIONS[input]
+      if (direction != null)
+        this.frog.move(direction)
+    }
+  }
+
   // Primero las reglas (fijan frog.ridingLog) y luego el movimiento: así la rana y su
-  // tronco se desplazan lo mismo en el frame y siguen alineados.
+  // tronco se desplazan lo mismo en el frame y siguen alineados. El orden es exigido:
+  // frog.update() lee el ridingLog que acaba de fijar checkCollisions().
   update() {
     if (this.state != GAME_STATES.PLAYING)
       return
@@ -96,6 +136,7 @@ class Game {
   }
 
   // Aplica las reglas comunes y pregunta a la fila de la rana (Lane.checkFrog) por las suyas.
+  // Único escritor de frog.ridingLog: cada fila solo consulta con Lane.rideFor().
   checkCollisions() {
     if (!this.frog.alive)
       return
@@ -107,19 +148,20 @@ class Game {
       return
     }
 
-    // Fuera del río no va sobre ningún tronco; RiverLane lo vuelve a fijar si toca
+    // La fila dice sobre qué va la rana (null fuera del río)
     const lane = this.lanes[this.frog.row()]
-    this.frog.ridingLog = null
+    this.frog.ridingLog = lane.rideFor(this.frog)
     const result = lane.checkFrog(this.frog)
 
     if (result == FROG_RESULT.DIE) {
       this.loseLife()
     } else if (result == FROG_RESULT.HOME) {
       this.score += HOME_POINTS
-      if (lane.allFilled())
-        this.state = GAME_STATES.WON
-      else
-        this.respawnFrog()
+      this.respawnFrog()
+    } else if (result == FROG_RESULT.WIN) {
+      // La victoria la decide HomeLane (ella conoce los agujeros); la rana no reaparece
+      this.score += HOME_POINTS
+      this.setState(GAME_STATES.WON)
     }
   }
 
@@ -128,7 +170,7 @@ class Game {
     this.lives--
     if (this.lives <= 0) {
       this.frog.alive = false
-      this.state = GAME_STATES.GAME_OVER
+      this.setState(GAME_STATES.GAME_OVER)
     } else {
       this.respawnFrog()
     }
@@ -141,41 +183,11 @@ class Game {
 
   // Partida nueva: cada fila recrea sus entidades en su posición inicial y vacía sus agujeros.
   reset() {
-    this.state = GAME_STATES.READY
+    this.setState(GAME_STATES.READY)
     this.lives = 3
     this.score = 0
     for (let row = 0; row < this.lanes.length; row++)
       this.lanes[row].build(row)
     this.respawnFrog()
-  }
-
-  // READY: cualquier tecla empieza. WON / GAME_OVER: 'R' reinicia. PLAYING: flechas o WASD.
-  handleKey(key, keyCode) {
-    if (this.state == GAME_STATES.READY) {
-      this.state = GAME_STATES.PLAYING
-      return
-    }
-
-    if (this.state == GAME_STATES.WON || this.state == GAME_STATES.GAME_OVER) {
-      if (key == 'r' || key == 'R')
-        this.reset()
-      return
-    }
-
-    if (this.state == GAME_STATES.PLAYING) {
-      let direction = createVector(0, 0)
-
-      if (keyCode == UP_ARROW || key == "w" || key == "W") {
-        direction = createVector(0, -CELL)
-      } else if (keyCode == DOWN_ARROW || key == "s" || key == "S") {
-        direction = createVector(0, CELL)
-      } else if (keyCode == LEFT_ARROW || key == "a" || key == "A") {
-        direction = createVector(-CELL, 0)
-      } else if (keyCode == RIGHT_ARROW || key == "d" || key == "D") {
-        direction = createVector(CELL, 0)
-      }
-
-      this.frog.move(direction)
-    }
   }
 }
