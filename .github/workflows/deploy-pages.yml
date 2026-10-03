@@ -1,0 +1,43 @@
+# CI/CD: GitHub Pages para el sitio estático de Frogger
+# Estrategia: deployment inmutable — cada push a main genera un artefacto
+# versionado y se publica como snapshot inmutable (con rollback nativo por run).
+# Sin credenciales hardcodeadas: usa el GITHUB_TOKEN gestionado por GitHub.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Permite desplegar bajo demanda (botón "Run workflow") para validar antes de mergear
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload site artifact
+        with:
+          path: .
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
