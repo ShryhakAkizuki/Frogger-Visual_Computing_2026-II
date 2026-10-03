@@ -32,13 +32,11 @@ const LANES = [
   new SafeLane(),                                                                 // 12
 ]
 
-const HOME_POINTS = 100
-
 
 class Game {
   constructor() {
     this.state = GAME_STATES.READY
-    this.lives = 3
+    this.lives = START_LIVES
     this.score = 0
     this.frog = null
     this.lanes = LANES
@@ -69,6 +67,11 @@ class Game {
     if (this.state != GAME_STATES.PLAYING)
       return
 
+    this.tickTimer()
+    if (this.state != GAME_STATES.PLAYING)
+      return
+
+    this.awardRowPoints()
     this.checkCollisions()
     if (this.state != GAME_STATES.PLAYING)
       return
@@ -77,6 +80,36 @@ class Game {
       lane.update()
 
     this.frog.update()
+  }
+
+  tickTimer() {
+    this.timeLeft -= 1
+    if (this.timeLeft <= 0)
+      this.loseLife()
+  }
+
+  timeLeftSeconds() {
+    return Math.ceil(this.timeLeft / FPS)
+  }
+
+  timeBonus() {
+    return Math.floor(this.timeLeft / FPS) * HOLE_TIME_BONUS_PER_SECOND
+  }
+
+  awardRowPoints() {
+    const row = this.frog.row()
+    if (row < this.bestRow) {
+      this.bestRow = row
+      this.addScore(ROW_POINT)
+    }
+  }
+
+  addScore(points) {
+    this.score += points
+    if (!this.extraLifeAwarded && this.score >= EXTRA_LIFE_SCORE) {
+      this.lives++
+      this.extraLifeAwarded = true
+    }
   }
 
   draw() {
@@ -98,7 +131,7 @@ class Game {
       lane.draw()
   }
 
-  // TODO: tiempo en la barra inferior y mensajes para READY / WON / GAME_OVER.
+  // TODO: mensajes para READY / WON / GAME_OVER.
   drawHUD() {
     const topY = 0
     const bottomY = HUD_H + BOARD
@@ -115,6 +148,8 @@ class Game {
     textAlign(LEFT, CENTER)
     text("SCORE: " + this.score, 10, topY + HUD_H / 2)
     text("VIDAS: " + this.lives, 10, bottomY + HUD_H / 2)
+    textAlign(RIGHT, CENTER)
+    text("TIEMPO: " + this.timeLeftSeconds(), BOARD - 10, bottomY + HUD_H / 2)
     pop()
   }
 
@@ -137,11 +172,11 @@ class Game {
     if (result == FROG_RESULT.DIE) {
       this.loseLife()
     } else if (result == FROG_RESULT.HOME) {
-      this.score += HOME_POINTS
+      this.addScore(HOLE_POINTS + this.timeBonus())
       this.respawnFrog()
     } else if (result == FROG_RESULT.WIN) {
       // Victoria: la decide HomeLane (conoce los agujeros); la rana no reaparece
-      this.score += HOME_POINTS
+      this.addScore(HOLE_POINTS + this.timeBonus() + WIN_POINTS)
       this.setState(GAME_STATES.WON)
     }
   }
@@ -157,13 +192,16 @@ class Game {
   }
 
   respawnFrog() {
-    this.frog = new Frog(createVector(CELL * 6, CELL * 12), CELL)
+    this.frog = new Frog(createVector(CELL * 6, CELL * START_ROW), CELL)
+    this.timeLeft = TIME_PER_LIFE * FPS
+    this.bestRow = START_ROW
   }
 
   reset() {
     this.setState(GAME_STATES.READY)
-    this.lives = 3
+    this.lives = START_LIVES
     this.score = 0
+    this.extraLifeAwarded = false
     for (let row = 0; row < this.lanes.length; row++)
       this.lanes[row].build(row)
     this.respawnFrog()

@@ -11,7 +11,7 @@ Recrear el primer nivel de Frogger. La rana se mueve sobre un tablero de 13×13 
 
 ### ✅ Funciona
 
-- Tablero de 13 filas con HUD arriba (score) y abajo (vidas).
+- Tablero de 13 filas con HUD arriba (score) y abajo (vidas y tiempo).
 - Rana con saltos de una celda (flechas o WASD), que no puede salir del tablero por sus propios medios.
 - Carros y troncos con velocidad y dirección por fila, anchos distintos y reaparición con retraso (pista circular).
 - Patrón inicial de cada fila definido a mano y validado al arrancar.
@@ -21,7 +21,10 @@ Recrear el primer nivel de Frogger. La rana se mueve sobre un tablero de 13×13 
   - troncos que transportan;
   - muerte al ser arrastrada fuera del tablero;
   - agujeros libres, ocupados y paredes de la meta.
-- Vidas, score (+100 por agujero) y estados `READY` → `PLAYING` → `WON` / `GAME_OVER`, con `R` para reiniciar.
+- `frameRate(FPS)` fijo en `setup()`: las velocidades son píxeles por frame y p5 por defecto corre a la frecuencia del monitor.
+- Tiempo por vida de 30 s contado en frames (exacto a `FPS`); al agotarse la rana muere. Se muestra en la barra inferior del HUD.
+- Vidas, score del original (10 por cada fila nueva alcanzada, 50 por agujero + bonus de 10 por segundo restante, 1000 por llenar los 4) y estados `READY` → `PLAYING` → `WON` / `GAME_OVER`, con `R` para reiniciar.
+- Vida extra a los 1 000 puntos, una sola vez por partida.
 
 ### ⏳ Falta para completar el primer nivel
 
@@ -29,16 +32,12 @@ En orden sugerido; los primeros son lógica pura y no dependen del aspecto visua
 
 | # | Tarea | Notas |
 |---|---|---|
-| 1 | `frameRate(60)` en `setup()` | **Importante.** Las velocidades están en píxeles por frame y p5 corre a la frecuencia del monitor: a 144 Hz el juego va ~2,4× más rápido. |
-| 2 | Temporizador por vida | ~30 s en el original. Al agotarse la rana muere. Se muestra en la barra inferior del HUD. |
-| 3 | Puntuación del original | 10 por cada fila nueva alcanzada (una vez por vida), 50 por agujero + bonus por tiempo restante, 1000 al llenar todos. |
-| 4 | HUD completo | Tiempo, y mensajes para `READY` / `WON` / `GAME_OVER`. Hoy solo muestra score y vidas. |
-| 5 | Pausa de muerte | Hoy la rana reaparece al instante. Congelar un momento, mostrar la muerte (atropellada / ahogada) y bloquear la entrada mientras dura. |
-| 6 | Tortugas que se hunden | Subclase de `Log` con un ciclo de inmersión; `carries()` devuelve `false` mientras está bajo el agua. Necesita un aviso visual antes de hundirse. |
-| 7 | Patrones del juego original | Ajustar `LANES` (velocidades, anchos, separaciones) al primer nivel del arcade. |
-| 8 | Texturas | Sprites para rana, carros (un tipo por carretera), troncos, tortugas, agua, césped y agujeros. |
-| 9 | Animaciones | Salto entre celdas, orientación de la rana según la dirección y animación de muerte. |
-| 10 | Vida extra | Al alcanzar cierto puntaje (20 000 en el original). |
+| 1 | HUD completo | Mensajes para `READY` / `WON` / `GAME_OVER`. Hoy el HUD ya muestra score, vidas y tiempo. |
+| 2 | Pausa de muerte | Hoy la rana reaparece al instante. Congelar un momento, mostrar la muerte (atropellada / ahogada) y bloquear la entrada mientras dura. |
+| 3 | Tortugas que se hunden | Subclase de `Log` con un ciclo de inmersión; `carries()` devuelve `false` mientras está bajo el agua. Necesita un aviso visual antes de hundirse. |
+| 4 | Patrones del juego original | Ajustar `LANES` (velocidades, anchos, separaciones) al primer nivel del arcade. |
+| 5 | Texturas | Sprites para rana, carros (un tipo por carretera), troncos, tortugas, agua, césped y agujeros. |
+| 6 | Animaciones | Salto entre celdas, orientación de la rana según la dirección y animación de muerte. |
 
 **Opcional / por decidir:**
 
@@ -77,7 +76,7 @@ Cuando una entidad sale por un lado, recorre el tramo oculto de la pista antes d
 - `loopCells < 13 + w` de la entidad más ancha, porque esa entidad aparecería de golpe dentro del tablero;
 - dos entidades se solapan, también a través del *wrap*.
 
-Valores actuales (provisionales, ver tarea 7):
+Valores actuales (provisionales, ver tarea 4):
 
 | Fila | Tipo | Dir. | `speed` | `loopCells` | `pattern` (`x`/`w`) |
 |---|---|---|---|---|---|
@@ -101,19 +100,19 @@ Sin bundler (compatible con GitHub Pages). Los scripts se cargan en este orden e
 ```
 frogger/
 ├── index.html        # carga los scripts en el orden anterior
-├── constants.js      # CELL, COLS, ROWS, BOARD, HUD_H (compartidas por todo el juego)
+├── constants.js      # constantes compartidas: dimensiones, FPS, reglas y puntuación
 ├── entities.js       # MovingEntity (base), Vehicle, Log
 ├── frog.js           # Frog, rectsOverlap()
 ├── lanes.js          # Lane (interfaz base), SafeLane, HomeLane, RoadLane, RiverLane,
 │                     #   FROG_RESULT
-├── game.js           # Game, LANES (definición de las 13 filas), GAME_STATES, INPUT, HOME_POINTS
+├── game.js           # Game, LANES (definición de las 13 filas), GAME_STATES, INPUT
 ├── frogger.js        # bootstrap de p5: setup(), draw(), keyPressed() y traducción de teclas. Sin lógica.
 └── libraries/p5.min.js
 ```
 
 | Archivo | Responsabilidad |
 |---|---|
-| `constants.js` | `CELL`, `COLS`, `ROWS`, `BOARD`, `HUD_H`. Sin lógica. |
+| `constants.js` | Dimensiones (`CELL`, `COLS`, `ROWS`, `BOARD`, `HUD_H`), `FPS` y reglas/puntuación de la partida. Sin lógica. |
 | `entities.js` | Qué se mueve y cómo se pinta. No conoce las reglas. |
 | `frog.js` | El jugador: salto, arrastre por tronco, caja de colisión. |
 | `lanes.js` | Las reglas **de cada tipo de fila**: qué le pasa a la rana en carretera, río o meta. |
@@ -136,6 +135,9 @@ classDiagram
         +score
         +frog: Frog
         +lanes: Lane[]
+        +timeLeft: int
+        +bestRow: int
+        +extraLifeAwarded: bool
         +update()
         +draw()
         +checkCollisions()
@@ -144,6 +146,10 @@ classDiagram
         +reset()
         +handleInput(input)
         +setState(next)
+        +tickTimer()
+        +awardRowPoints()
+        +addScore(points)
+        +timeBonus()
     }
 
     class Lane {
@@ -251,12 +257,14 @@ sequenceDiagram
 
     P5->>G: update()
     Note over G: solo en PLAYING
+    G->>G: tickTimer() (0 frames → loseLife())
+    G->>G: awardRowPoints() (fila nueva → +ROW_POINT)
     G->>F: centerX() fuera del tablero? → loseLife()
     G->>L: lanes[frog.row()].rideFor(frog)
     Note over G: frog.ridingLog = resultado (único escritor)
     G->>L: lanes[frog.row()].checkFrog(frog)
     L-->>G: OK / DIE / HOME / WIN
-    Note over G: DIE → loseLife()<br/>HOME → +score, respawnFrog()<br/>WIN → +score, estado WON
+    Note over G: DIE → loseLife()<br/>HOME → +HOLE_POINTS + timeBonus(), respawnFrog()<br/>WIN → +HOLE_POINTS + timeBonus() + WIN_POINTS, estado WON
     G->>L: update() en las 13 filas
     G->>F: update() (arrastre si ridingLog)
 
@@ -266,7 +274,7 @@ sequenceDiagram
     G->>G: drawHUD()
 ```
 
-Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ridingLog` consultando `Lane.rideFor()` (único escritor: las filas no mutan a la rana), y después la rana y su tronco se desplazan lo mismo en ese frame, así que siguen alineados. El orden `checkCollisions()` → `lanes.update()` → `frog.update()` es exigido: `frog.update()` lee el `ridingLog` que acaba de fijar `checkCollisions()`.
+Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ridingLog` consultando `Lane.rideFor()` (único escritor: las filas no mutan a la rana), y después la rana y su tronco se desplazan lo mismo en ese frame, así que siguen alineados. El orden `tickTimer()` → `awardRowPoints()` → `checkCollisions()` → `lanes.update()` → `frog.update()` es exigido: el timer y las filas de puntos se resuelven sobre la posición de la rana del frame anterior, y `frog.update()` lee el `ridingLog` que acaba de fijar `checkCollisions()`.
 
 ## 6. Reglas
 
@@ -277,7 +285,10 @@ Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ri
 | `RiverLane.checkFrog` | Hay tronco bajo la rana → `OK`; si no → `DIE`. |
 | `HomeLane.checkFrog` | El centro cae en un agujero libre → el agujero queda lleno y devuelve `HOME`, o `WIN` si con ese se llena el último. Pared o agujero lleno → `DIE`. |
 | `Game.checkCollisions` | El centro de la rana sale del tablero (arrastrada por un tronco) → muere. |
-| `Game.checkCollisions` | `HOME` → +100 puntos y la rana reaparece. `WIN` → +100 puntos y estado `WON` (la rana no reaparece). |
+| `Game.checkCollisions` | `HOME` → +`HOLE_POINTS` + bonus de tiempo y la rana reaparece. `WIN` → +`HOLE_POINTS` + bonus + `WIN_POINTS` y estado `WON` (la rana no reaparece). |
+| `Game.tickTimer` | `timeLeft` baja 1 frame por frame; a 0 la rana muere. Se reinicia a `TIME_PER_LIFE` en cada cruce. |
+| `Game.awardRowPoints` | `ROW_POINT` por cada fila nueva alcanzada, una vez por cruce (`bestRow` se reinicia al reaparecer). |
+| `Game.addScore` | Único punto donde sube el score; al llegar a `EXTRA_LIFE_SCORE` otorga una vida extra, una sola vez por partida. |
 | `Game.loseLife` | Toda muerte resta una vida; con 0 → `GAME_OVER`, si no la rana reaparece en columna 6, fila 12. |
 
 ## 7. Entrada
@@ -308,7 +319,8 @@ Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ri
 | Colisión con carros | AABB con la caja de la rana reducida 4 px. | Rozar un carro con el borde no se siente como un choque. |
 | Colisión con troncos y agujeros | Por el centro de la rana. | Tocar con una esquina no basta, y la rana puede llegar desalineada desde un tronco. |
 | Arrastre | Suma directa a `position`, sin `move()`. | `move()` bloquea en los bordes y dejaría la rana desincronizada del tronco. |
-| Timestep | Píxeles por frame, sin `deltaTime`. | Simple para el MVP; exige fijar `frameRate(60)` (ver tarea 1). |
+| Timestep | Píxeles por frame, sin `deltaTime`, a `FPS` fijos (`frameRate(FPS)` en `setup()`). | Simple para el MVP; el timer por vida se cuenta en frames enteros, exacto a esa frecuencia. |
+| Puntuación | `Game.addScore()` es el único punto donde sube el score; los valores de filas, agujeros y victoria viven en `constants.js`. | La vida extra se audita en un solo sitio y las reglas de puntos se ajustan en un solo archivo. |
 | Quién decide la victoria | `HomeLane`: devuelve `WIN` al llenar el último agujero; `Game` solo reacciona a `FROG_RESULT`. | `Game` no conoce los agujeros, y el enum `OK / DIE / HOME / WIN` cierra el contrato: ninguna otra fila puede devolver un resultado que `Game` no sepa manejar. |
 | Entrada | `frogger.js` traduce `key`/`keyCode` de p5 a un `INPUT` neutro; `Game.handleInput()` es la máquina de estados y `setState()` el único cambio de estado. `Frog.move()` recibe la dirección en celdas, sin p5. | El núcleo del juego no conoce los globals de p5, y las transiciones `READY` / `PLAYING` / `WON` / `GAME_OVER` se auditan en un solo sitio. |
 | `ridingLog` | `Game.checkCollisions()` es el único escritor: pregunta `Lane.rideFor()` (consulta pura) y guarda el resultado; `Frog` solo lo lee. | Las filas no mutan a la rana y la corrección (arrastre) no depende del orden de las llamadas. |

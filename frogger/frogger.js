@@ -4,6 +4,7 @@
 let game
 
 function setup() {
+  frameRate(FPS)
   createCanvas(BOARD, BOARD + 2 * HUD_H)
   game = new Game()
 }
