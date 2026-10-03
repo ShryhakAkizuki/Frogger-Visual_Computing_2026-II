@@ -1,37 +1,32 @@
-const vel = 1;
-let obstacle; // Declaración de la variable global
+// Bootstrap de p5.js: único punto del proyecto que conoce los globals de p5 (key,
+// keyCode); traduce cada tecla a un INPUT neutro (game.js) para Game. Sin reglas del juego.
+
+let game
 
 function setup() {
-  createCanvas(800, 1000);
-  obstacle = new Obstacle();
+  createCanvas(BOARD, BOARD + 2 * HUD_H)
+  game = new Game()
 }
 
 function draw() {
-  background(0);
-  obstacle.draw();
-  obstacle.update();
-  //rect(50, 50, 75, 100);
+  game.update()
+  game.draw()
 }
 
-class Obstacle {
-  constructor() {
-    this.xpos = 0;
-    this.vivo = true;
-  }
+function keyPressed() {
+  game.handleInput(inputFromKey(key, keyCode))
+}
 
-  draw() {
-    push();
-      noStroke();
-      fill(255, 0, 0);
-      rect(this.xpos, 0, 100, 100);
-    pop();
-  }
-
-  update() {
-    this.xpos = this.xpos + vel; 
-  }
-  
-  alive(){
-    this.vivo = false;
-  }
+function inputFromKey(key, keyCode) {
+  if (keyCode == UP_ARROW || key == "w" || key == "W")
+    return INPUT.UP
+  if (keyCode == DOWN_ARROW || key == "s" || key == "S")
+    return INPUT.DOWN
+  if (keyCode == LEFT_ARROW || key == "a" || key == "A")
+    return INPUT.LEFT
+  if (keyCode == RIGHT_ARROW || key == "d" || key == "D")
+    return INPUT.RIGHT
+  if (key == "r" || key == "R")
+    return INPUT.RESTART
+  return INPUT.OTHER
 }
