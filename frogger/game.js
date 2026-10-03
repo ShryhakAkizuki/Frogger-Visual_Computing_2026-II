@@ -1,21 +1,14 @@
-// El estado de la partida (vidas, score, estado), la definición del tablero, la máquina
-// de estados de entrada y las reglas comunes.
-// Las reglas de cada tipo de fila (carros, río, agujeros) están en lanes.js.
-
 const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
 
-// Comandos de entrada neutros: el juego no conoce key/keyCode de p5. frogger.js (el único
-// archivo que toca p5) traduce cada tecla pulsada a uno de estos.
 const INPUT = {
   UP: 'UP',
   DOWN: 'DOWN',
   LEFT: 'LEFT',
   RIGHT: 'RIGHT',
   RESTART: 'RESTART',
-  OTHER: 'OTHER',   // tecla que no es de movimiento ni de reinicio
+  OTHER: 'OTHER',
 }
 
-// Dirección (en celdas) de cada comando de movimiento; los demás no mueven a la rana.
 const DIRECTIONS = {
   [INPUT.UP]: { x: 0, y: -1 },
   [INPUT.DOWN]: { x: 0, y: 1 },
@@ -23,11 +16,6 @@ const DIRECTIONS = {
   [INPUT.RIGHT]: { x: 1, y: 0 },
 }
 
-// Las 13 filas del tablero, de arriba (0) a abajo (12).
-// RoadLane / RiverLane: (direction, speed, loopCells, pattern)
-//   direction: -1 (←) o 1 (→) · speed: píxeles por frame
-//   loopCells: longitud de la pista circular en celdas (13 visibles + el resto fuera de pantalla)
-//   pattern:   [{ x, w }] posición inicial y ancho de cada carro / tronco, en celdas
 const LANES = [
   new HomeLane([1, 4, 7, 10]),                                                    // 0
   new RiverLane(-1, 1.25, 18, [{ x: 0, w: 3 }, { x: 6, w: 4 }, { x: 12, w: 3 }]), // 1
@@ -44,7 +32,7 @@ const LANES = [
   new SafeLane(),                                                                 // 12
 ]
 
-const HOME_POINTS = 100   // puntos por llenar un agujero
+const HOME_POINTS = 100
 
 
 class Game {
@@ -62,9 +50,6 @@ class Game {
     this.state = next
   }
 
-  // Máquina de estados de entrada: decide qué hacer con un INPUT según el estado actual.
-  // READY: cualquier comando empieza (sin mover). WON / GAME_OVER: RESTART reinicia.
-  // PLAYING: los comandos de movimiento mueven a la rana.
   handleInput(input) {
     if (this.state == GAME_STATES.READY) {
       this.setState(GAME_STATES.PLAYING)
@@ -78,9 +63,8 @@ class Game {
     }
   }
 
-  // Primero las reglas (fijan frog.ridingLog) y luego el movimiento: así la rana y su
-  // tronco se desplazan lo mismo en el frame y siguen alineados. El orden es exigido:
-  // frog.update() lee el ridingLog que acaba de fijar checkCollisions().
+  // El orden es exigido: frog.update() lee el ridingLog que acaba de fijar
+  // checkCollisions(); así rana y tronco se desplazan lo mismo en el frame.
   update() {
     if (this.state != GAME_STATES.PLAYING)
       return
@@ -114,7 +98,6 @@ class Game {
       lane.draw()
   }
 
-  // Barra superior: score. Barra inferior: vidas (y tiempo, pendiente).
   // TODO: tiempo en la barra inferior y mensajes para READY / WON / GAME_OVER.
   drawHUD() {
     const topY = 0
@@ -135,7 +118,6 @@ class Game {
     pop()
   }
 
-  // Aplica las reglas comunes y pregunta a la fila de la rana (Lane.checkFrog) por las suyas.
   // Único escritor de frog.ridingLog: cada fila solo consulta con Lane.rideFor().
   checkCollisions() {
     if (!this.frog.alive)
@@ -148,7 +130,6 @@ class Game {
       return
     }
 
-    // La fila dice sobre qué va la rana (null fuera del río)
     const lane = this.lanes[this.frog.row()]
     this.frog.ridingLog = lane.rideFor(this.frog)
     const result = lane.checkFrog(this.frog)
@@ -159,13 +140,12 @@ class Game {
       this.score += HOME_POINTS
       this.respawnFrog()
     } else if (result == FROG_RESULT.WIN) {
-      // La victoria la decide HomeLane (ella conoce los agujeros); la rana no reaparece
+      // Victoria: la decide HomeLane (conoce los agujeros); la rana no reaparece
       this.score += HOME_POINTS
       this.setState(GAME_STATES.WON)
     }
   }
 
-  // Con 0 vidas termina la partida; si no, la rana vuelve al inicio.
   loseLife() {
     this.lives--
     if (this.lives <= 0) {
@@ -176,12 +156,10 @@ class Game {
     }
   }
 
-  // Rana nueva en el inicio (columna 6, fila 12)
   respawnFrog() {
     this.frog = new Frog(createVector(CELL * 6, CELL * 12), CELL)
   }
 
-  // Partida nueva: cada fila recrea sus entidades en su posición inicial y vacía sus agujeros.
   reset() {
     this.setState(GAME_STATES.READY)
     this.lives = 3

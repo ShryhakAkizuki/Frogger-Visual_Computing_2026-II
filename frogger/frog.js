@@ -1,14 +1,11 @@
-// Jugador. Posición en píxeles (esquina superior izquierda); salta CELL píxeles por tecla.
 class Frog {
   constructor(position, size) {
     this.position = position
     this.size = size
     this.alive = true
-    this.ridingLog = null   // tronco sobre el que va; lo fija Game.checkCollisions() con Lane.rideFor()
+    this.ridingLog = null   // tronco sobre el que va; único escritor: Game.checkCollisions() (vía Lane.rideFor())
   }
 
-  // Salto de `direction` celdas ({ x, y } con -1, 0 o 1); se ignora si saldría del
-  // tablero o la rana está muerta
   move(direction) {
     const next_x = this.position.x + direction.x * this.size
     const next_y = this.position.y + direction.y * this.size
@@ -24,8 +21,8 @@ class Frog {
     this.position.y = next_y
   }
 
-  // Arrastre por el tronco: suma directamente su velocidad (sin pasar por move(), que se
-  // bloquea en los bordes). Si el tronco la saca del tablero, Game.checkCollisions() la mata.
+  // Suma la velocidad del tronco directamente (move() se bloquea en los bordes); si sale
+  // del tablero, checkCollisions() la mata.
   update() {
     if (this.ridingLog != null)
       this.position.add(p5.Vector.mult(this.ridingLog.direction, this.ridingLog.speed))
@@ -35,13 +32,11 @@ class Frog {
     return this.position.x + this.size / 2
   }
 
-  // 0 = HOME
   row() {
     return floor((this.position.y + this.size / 2) / CELL)
   }
 
-  // Caja de colisión reducida `margin` píxeles por lado, para que rozar un carro
-  // con el borde no cuente como choque
+  // Caja reducida: rozar un carro con el borde no mata.
   hitbox(margin = 4) {
     return {
       x: this.position.x + margin,
@@ -60,8 +55,6 @@ class Frog {
   }
 }
 
-// Colisión entre cajas alineadas a los ejes (AABB). `a` y `b` son cajas { x, y, w, h },
-// p. ej. frog.hitbox() y entity.bounds().
 function rectsOverlap(a, b) {
   return a.x < b.x + b.w &&
     a.x + a.w > b.x &&
