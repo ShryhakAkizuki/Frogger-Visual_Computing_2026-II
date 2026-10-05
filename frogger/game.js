@@ -1,4 +1,4 @@
-const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
+const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', DYING: 'DYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
 
 const INPUT = {
   UP: 'UP',
@@ -16,20 +16,21 @@ const DIRECTIONS = {
   [INPUT.RIGHT]: { x: 1, y: 0 },
 }
 
+// Disposición y sprites según Frogger_game.png. Velocidades en px/frame (CELL = 16).
 const LANES = [
-  new HomeLane([1, 4, 7, 10]),                                                    // 0
-  new RiverLane(-1, 1.25, 18, [{ x: 0, w: 3 }, { x: 6, w: 4 }, { x: 12, w: 3 }]), // 1
-  new RiverLane( 1, 1.0,  17, [{ x: 0, w: 4 }, { x: 7, w: 4 }, { x: 13, w: 2 }]), // 2
-  new RiverLane(-1, 1.5,  18, [{ x: 1, w: 5 }, { x: 9, w: 3 }, { x: 14, w: 2 }]), // 3
-  new RiverLane( 1, 2.0,  17, [{ x: 0, w: 2 }, { x: 5, w: 3 }, { x: 11, w: 2 }]), // 4
-  new RiverLane(-1, 1.25, 18, [{ x: 2, w: 4 }, { x: 9, w: 4 }]),                  // 5
-  new SafeLane(),                                                                 // 6
-  new RoadLane(-1, 1.5,  15, [{ x: 0, w: 1 }, { x: 4, w: 1 }, { x: 8, w: 1 }]),   // 7
-  new RoadLane( 1, 2.5,  16, [{ x: 0, w: 2 }, { x: 7, w: 2 }]),                   // 8
-  new RoadLane(-1, 2.0,  17, [{ x: 0, w: 3 }, { x: 8, w: 3 }]),                   // 9  camiones
-  new RoadLane( 1, 3.0,  16, [{ x: 3, w: 1 }]),                                   // 10 un carro rápido
-  new RoadLane(-1, 1.75, 16, [{ x: 0, w: 1 }, { x: 3, w: 1 }, { x: 9, w: 2 }]),   // 11
-  new SafeLane(),                                                                 // 12
+  new HomeLane([0, 3, 6, 9, 12]),                                                       // 0  5 metas (columnas de la rana)
+  new RiverLane( 1, 0.35, 18, [{ x: 0, w: 4 }, { x: 6, w: 4 }, { x: 12, w: 4 }]),         // 1  troncos medianos
+  new RiverLane(-1, 0.45, 17, [{ x: 0, w: 2 }, { x: 4, w: 2 }, { x: 9, w: 2 }, { x: 13, w: 2 }], Turtle), // 2
+  new RiverLane( 1, 0.6,  20, [{ x: 0, w: 6 }, { x: 9, w: 6 }]),                        // 3  troncos largos
+  new RiverLane( 1, 0.4,  17, [{ x: 0, w: 3 }, { x: 5, w: 3 }, { x: 10, w: 3 }]),        // 4  troncos cortos
+  new RiverLane(-1, 0.35, 17, [{ x: 0, w: 3 }, { x: 5, w: 3 }, { x: 10, w: 3 }], Turtle), // 5
+  new SafeLane(),                                                                       // 6
+  new RoadLane(-1, 0.45, 16, [{ x: 0, w: 2 }, { x: 7, w: 2 }], 'truck'),                // 7
+  new RoadLane( 1, 0.9,  16, [{ x: 3, w: 1 }], 'car_white'),                            // 8  un carro rápido
+  new RoadLane(-1, 0.6,  15, [{ x: 0, w: 1 }, { x: 5, w: 1 }, { x: 9, w: 1 }], 'car_pink'),  // 9
+  new RoadLane( 1, 0.45, 15, [{ x: 0, w: 1 }, { x: 4, w: 1 }, { x: 8, w: 1 }], 'bulldozer'), // 10
+  new RoadLane(-1, 0.5,  15, [{ x: 0, w: 1 }, { x: 4, w: 1 }, { x: 8, w: 1 }], 'car_yellow'), // 11
+  new SafeLane(),                                                                       // 12
 ]
 
 
@@ -38,6 +39,7 @@ class Game {
     this.state = GAME_STATES.READY
     this.lives = START_LIVES
     this.score = 0
+    this.highScore = 0
     this.frog = null
     this.lanes = LANES
     this.reset()
@@ -64,6 +66,10 @@ class Game {
   // El orden es exigido: frog.update() lee el ridingLog que acaba de fijar
   // checkCollisions(); así rana y tronco se desplazan lo mismo en el frame.
   update() {
+    if (this.state == GAME_STATES.DYING) {
+      this.updateDying()
+      return
+    }
     if (this.state != GAME_STATES.PLAYING)
       return
 
@@ -82,10 +88,20 @@ class Game {
     this.frog.update()
   }
 
+  // Sin reloj, puntos ni colisiones: solo corre la animación y el tráfico sigue moviéndose.
+  updateDying() {
+    for (const lane of this.lanes)
+      lane.update()
+
+    this.frog.update()
+    if (this.frog.deathFinished())
+      this.loseLife()
+  }
+
   tickTimer() {
     this.timeLeft -= 1
     if (this.timeLeft <= 0)
-      this.loseLife()
+      this.killFrog(FROG_DEATH.TIME)
   }
 
   timeLeftSeconds() {
@@ -106,6 +122,7 @@ class Game {
 
   addScore(points) {
     this.score += points
+    this.highScore = Math.max(this.highScore, this.score)
     if (!this.extraLifeAwarded && this.score >= EXTRA_LIFE_SCORE) {
       this.lives++
       this.extraLifeAwarded = true
@@ -113,14 +130,16 @@ class Game {
   }
 
   draw() {
-    background(0)
+    background(COLORS.WATER)
 
     // El tablero se desplaza para dejar sitio a la barra superior del HUD; así la lógica
     // sigue usando coordenadas del tablero (y = 0 es la fila HOME).
     push()
-    translate(0, HUD_H)
+    translate(0, HUD_TOP)
     this.drawBoard()
-    this.frog.draw()
+    // Al ganar, la rana ya se ve dentro de su meta (HomeLane).
+    if (this.state != GAME_STATES.WON)
+      this.frog.draw()
     pop()
 
     this.drawHUD()
@@ -131,26 +150,55 @@ class Game {
       lane.draw()
   }
 
-  // TODO: mensajes para READY / WON / GAME_OVER.
   drawHUD() {
-    const topY = 0
-    const bottomY = HUD_H + BOARD
+    const bottomY = HUD_TOP + BOARD_H
 
     push()
     noStroke()
-    fill("blue")
-    rect(0, topY, BOARD, HUD_H)
-    fill("black")
-    rect(0, bottomY, BOARD, HUD_H)
+    textFont('monospace')
+    textStyle(BOLD)
+    textSize(CELL / 2)
+    textAlign(LEFT, TOP)
 
-    fill(255)
-    textSize(24)
-    textAlign(LEFT, CENTER)
-    text("SCORE: " + this.score, 10, topY + HUD_H / 2)
-    text("VIDAS: " + this.lives, 10, bottomY + HUD_H / 2)
-    textAlign(RIGHT, CENTER)
-    text("TIEMPO: " + this.timeLeftSeconds(), BOARD - 10, bottomY + HUD_H / 2)
+    fill(COLORS.TEXT)
+    text('1-UP', 2 * CELL, 1)
+    text('HI-SCORE', 5 * CELL, 1)
+    fill(COLORS.SCORE)
+    text(nf(this.score, 5), 2 * CELL, CELL / 2)
+    text(nf(this.highScore, 5), 6 * CELL, CELL / 2)
+
+    fill(COLORS.ROAD)
+    rect(0, bottomY, BOARD_W, HUD_BOTTOM)
+    for (let i = 0; i < this.lives; i++)
+      drawSprite('life', i * CELL / 2, bottomY)
+
+    // La barra se encoge hacia la derecha, pegada a la etiqueta TIME.
+    const barRight = BOARD_W - 2 * CELL
+    const barWidth = 7 * CELL * this.timeLeft / (TIME_PER_LIFE * FPS)
+    fill(COLORS.TIME_BAR)
+    rect(barRight - barWidth, bottomY + CELL / 2, barWidth, CELL / 2)
+    fill(COLORS.TIME_LABEL)
+    textAlign(RIGHT, TOP)
+    text('TIME', BOARD_W, bottomY + CELL / 2)
+
+    const message = this.stateMessage()
+    if (message != null) {
+      // Sobre la mediana (fila 6), donde el arcade muestra sus avisos.
+      const middleY = HUD_TOP + 6 * CELL
+      textAlign(CENTER, CENTER)
+      fill(COLORS.ROAD)
+      rect(BOARD_W / 2 - textWidth(message) / 2 - 4, middleY, textWidth(message) + 8, CELL)
+      fill(COLORS.SCORE)
+      text(message, BOARD_W / 2, middleY + CELL / 2)
+    }
     pop()
+  }
+
+  stateMessage() {
+    if (this.state == GAME_STATES.READY) return 'PULSA UNA TECLA'
+    if (this.state == GAME_STATES.WON) return 'GANASTE  R: REINICIAR'
+    if (this.state == GAME_STATES.GAME_OVER) return 'GAME OVER  R: REINICIAR'
+    return null
   }
 
   // Único escritor de frog.ridingLog: cada fila solo consulta con Lane.rideFor().
@@ -160,8 +208,8 @@ class Game {
 
     // Solo puede salir del tablero arrastrada por un tronco
     const centerX = this.frog.centerX()
-    if (centerX < 0 || centerX > BOARD) {
-      this.loseLife()
+    if (centerX < 0 || centerX > BOARD_W) {
+      this.killFrog(FROG_DEATH.WATER)
       return
     }
 
@@ -170,7 +218,7 @@ class Game {
     const result = lane.checkFrog(this.frog)
 
     if (result == FROG_RESULT.DIE) {
-      this.loseLife()
+      this.killFrog(lane.deathCause())
     } else if (result == FROG_RESULT.HOME) {
       this.addScore(HOLE_POINTS + this.timeBonus())
       this.respawnFrog()
@@ -181,18 +229,24 @@ class Game {
     }
   }
 
+  // La vida se descuenta al terminar la animación (updateDying()), no al morir.
+  killFrog(cause) {
+    this.frog.die(cause)
+    this.setState(GAME_STATES.DYING)
+  }
+
   loseLife() {
     this.lives--
     if (this.lives <= 0) {
-      this.frog.alive = false
       this.setState(GAME_STATES.GAME_OVER)
     } else {
       this.respawnFrog()
+      this.setState(GAME_STATES.PLAYING)
     }
   }
 
   respawnFrog() {
-    this.frog = new Frog(createVector(CELL * 6, CELL * START_ROW), CELL)
+    this.frog = new Frog(createVector(FROG_X_OFFSET + CELL * START_COL, CELL * START_ROW), CELL)
     this.timeLeft = TIME_PER_LIFE * FPS
     this.bestRow = START_ROW
   }

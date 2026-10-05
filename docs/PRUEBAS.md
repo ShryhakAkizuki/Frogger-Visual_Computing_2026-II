@@ -4,7 +4,7 @@ No hay framework de tests. Se carga el juego en Chromium sin interfaz con una p√
 
 ## Plantilla
 
-Ajusta el `<base href>` a la ruta absoluta de `frogger/` y cambia solo el bloque de comprobaciones. `game` existe tras el `load` de la ventana, porque lo crea `setup()`.
+Ajusta el `<base href>` a la ruta absoluta de `frogger/` y cambia solo el bloque de comprobaciones. `game` existe tras el `load` de la ventana, porque lo crea `setup()` (despu√©s de que `preload()` cargue los sprites).
 
 ```html
 <!DOCTYPE html>
@@ -14,6 +14,7 @@ Ajusta el `<base href>` a la ruta absoluta de `frogger/` y cambia solo el bloque
   <base href="file:///RUTA/AL/REPO/frogger/">
   <script src="libraries/p5.min.js"></script>
   <script src="constants.js"></script>
+  <script src="sprites.js"></script>
   <script src="entities.js"></script>
   <script src="frog.js"></script>
   <script src="lanes.js"></script>

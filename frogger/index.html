@@ -6,8 +6,9 @@
 
   <!-- PLEASE NO CHANGES BELOW THIS LINE (UNTIL I SAY SO) -->
   <script language="javascript" type="text/javascript" src="libraries/p5.min.js"></script>
-  <!-- LOADING ORDER: p5.min.js → constants.js → entities.js → frog.js → lanes.js → game.js → frogger.js -->
+  <!-- LOADING ORDER: p5.min.js → constants.js → sprites.js → entities.js → frog.js → lanes.js → game.js → frogger.js -->
   <script language="javascript" type="text/javascript" src="constants.js"></script>
+  <script language="javascript" type="text/javascript" src="sprites.js"></script>
   <script language="javascript" type="text/javascript" src="entities.js"></script>
   <script language="javascript" type="text/javascript" src="frog.js"></script>
   <script language="javascript" type="text/javascript" src="lanes.js"></script>
@@ -27,6 +28,7 @@
     }
     canvas {
       margin: 0;
+      image-rendering: pixelated;
     }
   </style>
 </head>
