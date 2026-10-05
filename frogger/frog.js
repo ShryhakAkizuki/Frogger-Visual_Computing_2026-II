@@ -4,7 +4,7 @@ class Frog {
     this.size = size
     this.alive = true
     this.ridingLog = null   // tronco sobre el que va; único escritor: Game.checkCollisions() (vía Lane.rideFor())
-    this.sprite = loadImage("imagenes/frog.png")
+    this.sprite = loadImage("../images/frog_up.png")
     this.direction = createVector(0, -1) // empieza mirando hacia arriba
   }
 
