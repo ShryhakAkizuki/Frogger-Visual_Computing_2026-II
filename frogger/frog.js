@@ -4,6 +4,8 @@ class Frog {
     this.size = size
     this.alive = true
     this.ridingLog = null   // tronco sobre el que va; único escritor: Game.checkCollisions() (vía Lane.rideFor())
+    this.sprite = loadImage("imagenes/frog.png")
+    this.direction = createVector(0, -1) // empieza mirando hacia arriba
   }
 
   move(direction) {
@@ -16,7 +18,8 @@ class Frog {
 
     if (this.alive != true)
       return
-
+    
+    this.direction = createVector(direction.x, direction.y)
     this.position.x = next_x
     this.position.y = next_y
   }
@@ -48,9 +51,29 @@ class Frog {
 
   draw() {
     push()
-    noStroke()
-    fill(255)
-    rect(this.position.x, this.position.y, this.size, this.size)
+
+    translate(
+      this.position.x + this.size / 2,
+      this.position.y + this.size / 2
+    )
+
+    if (this.direction.x == 1) {
+      rotate(HALF_PI)
+    } else if (this.direction.x == -1) {
+      rotate(-HALF_PI)
+    } else if (this.direction.y == 1) {
+      rotate(PI)
+    }
+
+    imageMode(CENTER)
+    image(
+      this.sprite,
+      0,
+      0,
+      this.size,
+      this.size
+    )
+
     pop()
   }
 }
