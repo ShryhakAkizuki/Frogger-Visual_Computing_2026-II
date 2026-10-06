@@ -50,12 +50,12 @@ class Lane {
     this.validatePattern(loopCells, pattern)
 
     const loopLength = loopCells * CELL
-    for (const { x, w } of pattern) {
+    for (const entry of pattern) {
       // Las x más allá del tablero se pasan al tramo izquierdo de la pista (fuera de pantalla)
-      let px = x * CELL
+      let px = entry.x * CELL
       if (px >= BOARD_W)
         px -= loopLength
-      this.entities.push(make(createVector(px, this.row * CELL), w * CELL, loopLength))
+      this.entities.push(make(createVector(px, this.row * CELL), entry.w * CELL, loopLength, entry))
     }
   }
 
@@ -174,6 +174,7 @@ class RoadLane extends Lane {
 
 class RiverLane extends Lane {
   // `Platform` es la clase de lo que flota (Log o Turtle): ambas llevan a la rana igual.
+  // Una entrada del patrón puede cambiarla con su propio `Platform` (p. ej. DivingTurtle).
   constructor(direction, speed, loopCells, pattern, Platform = Log) {
     super()
     this.direction = direction
@@ -185,8 +186,10 @@ class RiverLane extends Lane {
 
   build(row) {
     super.build(row)
-    this.buildPattern(this.loopCells, this.pattern, (position, width, loopLength) =>
-      new this.Platform(position, width, CELL, this.speed, createVector(this.direction, 0), loopLength))
+    this.buildPattern(this.loopCells, this.pattern, (position, width, loopLength, entry) => {
+      const Platform = entry.Platform || this.Platform
+      return new Platform(position, width, CELL, this.speed, createVector(this.direction, 0), loopLength)
+    })
   }
 
   drawBackground() {

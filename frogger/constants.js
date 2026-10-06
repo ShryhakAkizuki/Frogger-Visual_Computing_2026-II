@@ -24,6 +24,12 @@ const DEATH_FRAME_TIME = 10
 const DEATH_WAIT_FRAMES = 60
 const TURTLE_FRAME_TIME = 15
 
+// Ciclo de las tortugas que se hunden (frames): 4 s a flote, 1 s hundiéndose,
+// 1,5 s bajo el agua y 1 s saliendo. Hundiéndose o saliendo todavía llevan a la rana.
+const TURTLE_SURFACE_FRAMES = 240
+const TURTLE_DIVE_FRAMES = 60
+const TURTLE_UNDER_FRAMES = 90
+
 // Colores tomados de Frogger_game.png
 const COLORS = {
   WATER: '#000047',

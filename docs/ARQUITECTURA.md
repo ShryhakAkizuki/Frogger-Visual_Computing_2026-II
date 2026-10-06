@@ -21,6 +21,7 @@ Recrear el primer nivel de Frogger. La rana se mueve sobre un tablero de 14 colu
   - carros que matan;
   - río que hunde;
   - troncos que transportan;
+  - tortugas que se hunden (una pareja en la fila 2 y un trío en la fila 5) y ahogan a la rana si está encima cuando quedan bajo el agua;
   - muerte al ser arrastrada fuera del tablero;
   - agujeros libres, ocupados y paredes de la meta.
 - `frameRate(FPS)` fijo en `setup()`: las velocidades son píxeles por frame y p5 por defecto corre a la frecuencia del monitor.
@@ -34,8 +35,7 @@ En orden sugerido; los primeros son lógica pura y no dependen del aspecto visua
 
 | # | Tarea | Notas |
 |---|---|---|
-| 1 | Tortugas que se hunden | Subclase de `Turtle` con un ciclo de inmersión (`turtle_dive_1/2`); `carries()` devuelve `false` mientras está bajo el agua. |
-| 2 | Afinar velocidades | La disposición de `LANES` copia `Frogger_game.png`; las velocidades son estimadas. |
+| 1 | Afinar velocidades | La disposición de `LANES` copia `Frogger_game.png`; las velocidades son estimadas. |
 
 **Opcional / por decidir:**
 
@@ -68,7 +68,7 @@ Cada fila se define en la constante `LANES` (`game.js`) como `new RiverLane(dire
 | `direction` | −1 (←) o +1 (→). Común a toda la fila. |
 | `speed` | Píxeles por frame. Común a toda la fila. |
 | `loopCells` | Longitud de la **pista circular** de la fila, en celdas. Las celdas 0–13 son visibles; el resto queda fuera de pantalla. |
-| `pattern` | `[{ x, w }]`: posición inicial y ancho de cada entidad, en celdas sobre la pista (`x ≥ 14` empieza fuera de pantalla). |
+| `pattern` | `[{ x, w }]`: posición inicial y ancho de cada entidad, en celdas sobre la pista (`x ≥ 14` empieza fuera de pantalla). En el río, una entrada puede llevar su propio `Platform` (p. ej. `{ x: 4, w: 2, Platform: DivingTurtle }`). |
 | `Platform` | Solo río: clase de lo que flota (`Log` o `Turtle`). |
 | `sprite` | Solo carretera: nombre del sprite de los vehículos (`truck` mide 2 celdas). |
 
@@ -78,15 +78,15 @@ Cuando una entidad sale por un lado, recorre el tramo oculto de la pista antes d
 - `loopCells < 14 + w` de la entidad más ancha, porque esa entidad aparecería de golpe dentro del tablero;
 - dos entidades se solapan, también a través del *wrap*.
 
-Valores actuales (disposición de `Frogger_game.png`; velocidades estimadas, ver tarea 2):
+Valores actuales (disposición de `Frogger_game.png`; velocidades estimadas, ver tarea 1):
 
 | Fila | Tipo | Dir. | `speed` | `loopCells` | `pattern` (`x`/`w`) | Sprite |
 |---|---|---|---|---|---|---|
 | 1 | `RIVER` | → | 0.35 | 18 | 0/4 · 6/4 · 12/4 | `Log` |
-| 2 | `RIVER` | ← | 0.45 | 17 | 0/2 · 4/2 · 9/2 · 13/2 | `Turtle` |
+| 2 | `RIVER` | ← | 0.45 | 17 | 0/2 · 4/2* · 9/2 · 13/2 | `Turtle` (*`DivingTurtle`) |
 | 3 | `RIVER` | → | 0.6 | 20 | 0/6 · 9/6 | `Log` |
 | 4 | `RIVER` | → | 0.4 | 17 | 0/3 · 5/3 · 10/3 | `Log` |
-| 5 | `RIVER` | ← | 0.35 | 17 | 0/3 · 5/3 · 10/3 | `Turtle` |
+| 5 | `RIVER` | ← | 0.35 | 17 | 0/3 · 5/3 · 10/3* | `Turtle` (*`DivingTurtle`) |
 | 7 | `ROAD` | ← | 0.45 | 16 | 0/2 · 7/2 | `truck` |
 | 8 | `ROAD` | → | 0.9 | 16 | 3/1 | `car_white` |
 | 9 | `ROAD` | ← | 0.6 | 15 | 0/1 · 5/1 · 9/1 | `car_pink` |
@@ -106,7 +106,7 @@ frogger/
 ├── index.html        # carga los scripts en el orden anterior
 ├── constants.js      # constantes compartidas: dimensiones, FPS, animaciones, colores, reglas y puntuación
 ├── sprites.js        # SPRITES, loadSprites(), drawSprite()
-├── entities.js       # MovingEntity (base), Vehicle, Log, Turtle
+├── entities.js       # MovingEntity (base), Vehicle, Log, Turtle, DivingTurtle
 ├── frog.js           # Frog, FROG_DEATH, rectsOverlap()
 ├── lanes.js          # Lane (interfaz base), SafeLane, HomeLane, RoadLane, RiverLane,
 │                     #   FROG_RESULT
@@ -219,6 +219,11 @@ classDiagram
         +carries(frog)
     }
     class Turtle
+    class DivingTurtle {
+        +diveLevel()
+        +isUnder()
+        +carries(frog)
+    }
 
     class Frog {
         +position: Vector
@@ -250,8 +255,9 @@ classDiagram
     MovingEntity <|-- Vehicle
     MovingEntity <|-- Log
     Log <|-- Turtle
+    Turtle <|-- DivingTurtle
     RoadLane ..> Vehicle : crea
-    RiverLane ..> Log : crea (Log o Turtle)
+    RiverLane ..> Log : crea (Log, Turtle o DivingTurtle)
     Frog --> "0..1" Log : ridingLog
 ```
 
@@ -311,6 +317,7 @@ Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ri
 | `RoadLane.checkFrog` | La caja de la rana (`hitbox()`, 2 px más pequeña por lado) toca un carro → `DIE`. |
 | `RiverLane.rideFor` | El centro de la rana está sobre un tronco → lo devuelve; si no, `null`. `Game` lo guarda en `frog.ridingLog` (único escritor) y el tronco la arrastra. |
 | `RiverLane.checkFrog` | Hay tronco bajo la rana → `OK`; si no → `DIE`. |
+| `DivingTurtle.carries` | Ciclo por `age`: `TURTLE_SURFACE_FRAMES` a flote, `TURTLE_DIVE_FRAMES` hundiéndose (`turtle_dive_1/2`), `TURTLE_UNDER_FRAMES` bajo el agua y otros `TURTLE_DIVE_FRAMES` saliendo. Solo bajo el agua deja de llevar a la rana, así que `RiverLane.checkFrog` devuelve `DIE` (ahogada). |
 | `HomeLane.checkFrog` | El centro cae en una meta libre (rango de 16 px en x, `holeX(i)`) → el agujero queda lleno y devuelve `HOME`, o `WIN` si con ese se llena el último. Pared o agujero lleno → `DIE`. |
 | `Lane.deathCause` | Animación de cada muerte: `WATER` en el río (también al salir del tablero arrastrada), `ROAD` en carretera y contra el arbusto de la meta, `TIME` (solo calavera) al agotarse el tiempo. |
 | `Game.checkCollisions` | El centro de la rana sale del tablero (arrastrada por un tronco) → muere. |

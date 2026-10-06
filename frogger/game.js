@@ -20,10 +20,10 @@ const DIRECTIONS = {
 const LANES = [
   new HomeLane([0, 3, 6, 9, 12]),                                                       // 0  5 metas (columnas de la rana)
   new RiverLane( 1, 0.35, 18, [{ x: 0, w: 4 }, { x: 6, w: 4 }, { x: 12, w: 4 }]),         // 1  troncos medianos
-  new RiverLane(-1, 0.45, 17, [{ x: 0, w: 2 }, { x: 4, w: 2 }, { x: 9, w: 2 }, { x: 13, w: 2 }], Turtle), // 2
+  new RiverLane(-1, 0.45, 17, [{ x: 0, w: 2 }, { x: 4, w: 2, Platform: DivingTurtle }, { x: 9, w: 2 }, { x: 13, w: 2 }], Turtle), // 2
   new RiverLane( 1, 0.6,  20, [{ x: 0, w: 6 }, { x: 9, w: 6 }]),                        // 3  troncos largos
   new RiverLane( 1, 0.4,  17, [{ x: 0, w: 3 }, { x: 5, w: 3 }, { x: 10, w: 3 }]),        // 4  troncos cortos
-  new RiverLane(-1, 0.35, 17, [{ x: 0, w: 3 }, { x: 5, w: 3 }, { x: 10, w: 3 }], Turtle), // 5
+  new RiverLane(-1, 0.35, 17, [{ x: 0, w: 3 }, { x: 5, w: 3 }, { x: 10, w: 3, Platform: DivingTurtle }], Turtle), // 5
   new SafeLane(),                                                                       // 6
   new RoadLane(-1, 0.45, 16, [{ x: 0, w: 2 }, { x: 7, w: 2 }], 'truck'),                // 7
   new RoadLane( 1, 0.9,  16, [{ x: 3, w: 1 }], 'car_white'),                            // 8  un carro rápido

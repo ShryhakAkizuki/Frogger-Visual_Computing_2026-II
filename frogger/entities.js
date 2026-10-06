@@ -86,3 +86,43 @@ class Turtle extends Log {
       drawSprite(frame, this.position.x + i * CELL, this.position.y)
   }
 }
+
+// De menos a más hundida.
+const TURTLE_DIVE_SPRITES = ['turtle_dive_1', 'turtle_dive_2']
+const TURTLE_UNDER = TURTLE_DIVE_SPRITES.length + 1
+
+class DivingTurtle extends Turtle {
+  // 0 = a flote, 1..2 = sprite de inmersión, TURTLE_UNDER = bajo el agua.
+  // Usa `age`, así el ciclo se congela con el juego igual que la animación.
+  diveLevel() {
+    const steps = TURTLE_DIVE_SPRITES.length
+    const cycle = TURTLE_SURFACE_FRAMES + 2 * TURTLE_DIVE_FRAMES + TURTLE_UNDER_FRAMES
+    let t = this.age % cycle
+
+    if (t < TURTLE_SURFACE_FRAMES) return 0
+    t -= TURTLE_SURFACE_FRAMES
+    if (t < TURTLE_DIVE_FRAMES) return 1 + Math.floor(t * steps / TURTLE_DIVE_FRAMES)
+    t -= TURTLE_DIVE_FRAMES
+    if (t < TURTLE_UNDER_FRAMES) return TURTLE_UNDER
+    t -= TURTLE_UNDER_FRAMES
+    return steps - Math.floor(t * steps / TURTLE_DIVE_FRAMES)
+  }
+
+  isUnder() {
+    return this.diveLevel() == TURTLE_UNDER
+  }
+
+  carries(frog) {
+    return !this.isUnder() && super.carries(frog)
+  }
+
+  draw() {
+    const level = this.diveLevel()
+    if (level == 0) {
+      super.draw()
+    } else if (level != TURTLE_UNDER) {
+      for (let i = 0; i < this.cells(); i++)
+        drawSprite(TURTLE_DIVE_SPRITES[level - 1], this.position.x + i * CELL, this.position.y)
+    }
+  }
+}
