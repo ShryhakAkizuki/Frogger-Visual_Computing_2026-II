@@ -3,7 +3,7 @@
 const MENU_ACTION = { NONE: 'NONE', PLAY: 'PLAY' }
 
 const DOCS_URL = 'https://github.com/ShryhakAkizuki/Frogger-Visual_Computing_2026-II'
-const CREDITS = ['OSCAR RIVEROS PEREZ', 'CAMILO LONDOÑO MORENO', 'Omar Nicolás Guerrero']
+const CREDITS = ['OSCAR RIVEROS PEREZ', 'CAMILO LONDOÑO MORENO', 'Omar Nicolás Guerrero','Oscar Ivan Ulises Gutiérrez Palacios']
 
 // Disposición según FroggerTable.png, en coordenadas del canvas sobre la rejilla de 8 px del
 // arcade. Como en el tablero, río arriba y carretera abajo.
