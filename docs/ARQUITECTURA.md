@@ -26,8 +26,9 @@ Recrear el primer nivel de Frogger. La rana se mueve sobre un tablero de 14 colu
   - muerte al ser arrastrada fuera del tablero;
   - agujeros libres, ocupados y paredes de la meta.
 - `frameRate(FPS)` fijo en `setup()`: las velocidades son píxeles por frame y p5 por defecto corre a la frecuencia del monitor.
-- Tiempo por vida de 30 s contado en frames (exacto a `FPS`); al agotarse la rana muere. Se muestra en la barra inferior del HUD.
-- Vidas, score del original (10 por cada fila nueva alcanzada, 50 por agujero + bonus de 10 por segundo restante, 1000 por llenar las 5) y estados `MENU` → `PLAYING` → `WON` / `GAME_OVER`, que vuelven al menú a los 3 s (`END_SCREEN_FRAMES`) o con Enter.
+- Tiempo por vida de 30 s contado en frames (exacto a `FPS`); al agotarse la rana muere. Se muestra en la barra inferior del HUD, que pasa a rojo en los últimos 10 s (`TIME_WARNING_SECONDS`).
+- Vidas, score del original (10 por cada fila nueva alcanzada, 50 por agujero + bonus de 10 por segundo restante, 1000 por llenar las 5) y estados `MENU` → `PLAYING` → `WON` / `GAME_OVER`, que vuelven al menú a los 4 s (`END_SCREEN_FRAMES`, lo que dura `GameOver.mp3`) o con Enter.
+- Música y sonidos (`audio.js`, archivos en `music/`): `HomeScreen` en bucle en el menú, `MainSoundtrack` en bucle durante la partida (no se corta al morir), `GameOver` una vez al ganar o perder; `Hop` en cada salto, `DieOnLand` (carretera, arbusto y tiempo), `Drown` (agua), `Homed` al llegar a una meta y `TimeWarning` una vez por vida al bajar de 10 s.
 - Vida extra a los 1 000 puntos, una sola vez por partida.
 
 ### ⏳ Falta para completar el primer nivel
@@ -42,7 +43,7 @@ En orden sugerido; los primeros son lógica pura y no dependen del aspecto visua
 
 - Peligros y bonus del original: serpiente, cocodrilos, rana hembra.
 - Pasar al siguiente nivel al llenar los agujeros. Hoy `WON` termina la partida.
-- Sonido, pausa y récord persistente.
+- Pausa, silenciar y récord persistente.
 
 ## 3. Tablero
 
@@ -100,13 +101,14 @@ Los sprites ya miran en la dirección de su fila; no se voltean.
 
 Sin bundler (compatible con GitHub Pages). Los scripts se cargan en este orden en [`frogger/index.html`](../frogger/index.html), y el orden es obligatorio:
 
-`p5.min.js` → `constants.js` → `sprites.js` → `entities.js` → `frog.js` → `lanes.js` → `menu.js` → `game.js` → `frogger.js`
+`p5.min.js` → `constants.js` → `sprites.js` → `audio.js` → `entities.js` → `frog.js` → `lanes.js` → `menu.js` → `game.js` → `frogger.js`
 
 ```
 frogger/
 ├── index.html        # carga los scripts en el orden anterior
 ├── constants.js      # constantes compartidas: dimensiones, FPS, animaciones, colores, reglas y puntuación
 ├── sprites.js        # SPRITES, loadSprites(), drawSprite(), drawText() (fuente del arcade)
+├── audio.js          # SOUNDS, loadSounds(), playMusic(), stopMusic(), resumeMusic(), playSound()
 ├── entities.js       # MovingEntity (base), Vehicle, Log, Turtle, DivingTurtle
 ├── frog.js           # Frog, FROG_DEATH, rectsOverlap()
 ├── lanes.js          # Lane (interfaz base), SafeLane, HomeLane, RoadLane, RiverLane,
@@ -121,6 +123,7 @@ frogger/
 |---|---|
 | `constants.js` | Dimensiones (`CELL`, `COLS`, `ROWS`, `BOARD_W`, `BOARD_H`, `HUD_TOP`, `HUD_BOTTOM`, `FROG_X_OFFSET`), `FPS`, duración de animaciones, `COLORS` y reglas/puntuación de la partida. Sin lógica. |
 | `sprites.js` | Carga las imágenes de `../images/` en `preload()` y las dibuja por nombre con la posición redondeada. `drawText()` escribe con `font.png` (glifos de 8×8 por color, sin tildes ni Ñ: se quitan al dibujar). |
+| `audio.js` | Carga los mp3 de `../music/` en `preload()` como `<audio>` del navegador (sin p5.sound). Una sola pista de música a la vez (`playMusic()`; pedir la que ya suena no la reinicia) y efectos por nombre (`playSound()`). El navegador bloquea el audio hasta la primera tecla: `keyPressed()` llama a `resumeMusic()`. |
 | `entities.js` | Qué se mueve y cómo se pinta. No conoce las reglas. |
 | `frog.js` | El jugador: salto, arrastre por tronco, caja de colisión, animaciones de salto y muerte. |
 | `lanes.js` | Las reglas **de cada tipo de fila**: qué le pasa a la rana en carretera, río o meta. |
@@ -162,7 +165,9 @@ classDiagram
         +isOver()
         +handleInput(input)
         +setState(next)
+        +playStateMusic()
         +tickTimer()
+        +isTimeLow()
         +awardRowPoints()
         +addScore(points)
         +timeBonus()
@@ -341,7 +346,7 @@ Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ri
 | `Lane.deathCause` | Animación de cada muerte: `WATER` en el río (también al salir del tablero arrastrada), `ROAD` en carretera y contra el arbusto de la meta, `TIME` (solo calavera) al agotarse el tiempo. |
 | `Game.checkCollisions` | El centro de la rana sale del tablero (arrastrada por un tronco) → muere. |
 | `Game.checkCollisions` | `HOME` → +`HOLE_POINTS` + bonus de tiempo + `lane.takeBonus()` y la rana reaparece. `WIN` → +`HOLE_POINTS` + bonus + `WIN_POINTS` y estado `WON` (la rana no reaparece). |
-| `Game.tickTimer` | `timeLeft` baja 1 frame por frame; a 0 la rana muere. El reloj se para en `DYING`. Se reinicia a `TIME_PER_LIFE` en cada cruce. |
+| `Game.tickTimer` | `timeLeft` baja 1 frame por frame; al bajar de `TIME_WARNING_SECONDS` suena `TimeWarning` y la barra pasa a rojo; a 0 la rana muere. El reloj se para en `DYING`. Se reinicia a `TIME_PER_LIFE` en cada cruce. |
 | `Game.awardRowPoints` | `ROW_POINT` por cada fila nueva alcanzada, una vez por cruce (`bestRow` se reinicia al reaparecer). |
 | `Game.addScore` | Único punto donde sube el score; al llegar a `EXTRA_LIFE_SCORE` otorga una vida extra, una sola vez por partida. |
 | `Game.killFrog` | Toda muerte pasa a `DYING`: la rana muestra 3 frames de `DEATH_FRAME_TIME` (según la causa) y la calavera durante `DEATH_WAIT_FRAMES`, mientras el tráfico sigue. |

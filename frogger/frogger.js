@@ -6,6 +6,7 @@ let canvas
 
 function preload() {
   loadSprites()
+  loadSounds()
 }
 
 function setup() {
@@ -35,6 +36,8 @@ function fitCanvas() {
 }
 
 function keyPressed() {
+  // La música del menú no puede sonar antes de la primera tecla (política de autoplay).
+  resumeMusic()
   game.handleInput(inputFromKey(key, keyCode))
 }
 

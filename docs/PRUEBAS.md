@@ -15,6 +15,7 @@ Ajusta el `<base href>` a la ruta absoluta de `frogger/` y cambia solo el bloque
   <script src="libraries/p5.min.js"></script>
   <script src="constants.js"></script>
   <script src="sprites.js"></script>
+  <script src="audio.js"></script>
   <script src="entities.js"></script>
   <script src="frog.js"></script>
   <script src="lanes.js"></script>

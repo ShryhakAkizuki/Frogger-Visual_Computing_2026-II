@@ -16,6 +16,13 @@ const DIRECTIONS = {
   [INPUT.RIGHT]: { x: 1, y: 0 },
 }
 
+// Morir por tiempo suena como en carretera: el arcade no tiene un sonido propio para eso.
+const DEATH_SOUNDS = {
+  [FROG_DEATH.ROAD]: 'DieOnLand',
+  [FROG_DEATH.WATER]: 'Drown',
+  [FROG_DEATH.TIME]: 'DieOnLand',
+}
+
 // Disposición y sprites según Frogger_game.png. Velocidades en px/frame (CELL = 16).
 const LANES = [
   new HomeLane([0, 3, 6, 9, 12]),                                                       // 0  5 metas (columnas de la rana)
@@ -49,6 +56,17 @@ class Game {
   setState(next) {
     this.state = next
     this.stateFrames = 0
+    this.playStateMusic()
+  }
+
+  // DYING no cambia la música; GameOver suena una vez, al ganar o al perder.
+  playStateMusic() {
+    if (this.state == GAME_STATES.MENU)
+      playMusic('HomeScreen')
+    else if (this.state == GAME_STATES.PLAYING)
+      playMusic('MainSoundtrack')
+    else if (this.isOver())
+      playMusic('GameOver', false)
   }
 
   handleInput(input) {
@@ -60,8 +78,8 @@ class Game {
         this.returnToMenu()
     } else if (this.state == GAME_STATES.PLAYING) {
       const direction = DIRECTIONS[input]
-      if (direction != null)
-        this.frog.move(direction)
+      if (direction != null && this.frog.move(direction))
+        playSound('Hop')
     }
   }
 
@@ -107,9 +125,16 @@ class Game {
   }
 
   tickTimer() {
+    const wasLow = this.isTimeLow()
     this.timeLeft -= 1
+    if (!wasLow && this.isTimeLow())
+      playSound('TimeWarning')
     if (this.timeLeft <= 0)
       this.killFrog(FROG_DEATH.TIME)
+  }
+
+  isTimeLow() {
+    return this.timeLeft < TIME_WARNING_SECONDS * FPS
   }
 
   timeLeftSeconds() {
@@ -188,7 +213,7 @@ class Game {
     // La barra se encoge hacia la derecha, pegada a la etiqueta TIME.
     const barRight = BOARD_W - 2 * CELL
     const barWidth = 7 * CELL * this.timeLeft / (TIME_PER_LIFE * FPS)
-    fill(COLORS.TIME_BAR)
+    fill(this.isTimeLow() ? COLORS.TIME_BAR_LOW : COLORS.TIME_BAR)
     rect(barRight - barWidth, bottomY + CELL / 2, barWidth, CELL / 2)
     fill(COLORS.TIME_LABEL)
     textAlign(RIGHT, TOP)
@@ -233,6 +258,7 @@ class Game {
       this.killFrog(lane.deathCause())
     } else if (result == FROG_RESULT.HOME) {
       this.addScore(HOLE_POINTS + this.timeBonus() + lane.takeBonus())
+      playSound('Homed')
       this.respawnFrog()
     } else if (result == FROG_RESULT.WIN) {
       // Victoria: la decide HomeLane (conoce los agujeros); la rana no reaparece
@@ -244,6 +270,7 @@ class Game {
   // La vida se descuenta al terminar la animación (updateDying()), no al morir.
   killFrog(cause) {
     this.frog.die(cause)
+    playSound(DEATH_SOUNDS[cause])
     this.setState(GAME_STATES.DYING)
   }
 

@@ -22,22 +22,24 @@ class Frog {
 
   // La posición lógica cambia de golpe (las reglas no cambian); el salto es solo visual
   // y bloquea la entrada mientras dura, como en el arcade.
+  // Devuelve si saltó, para que Game decida el sonido.
   move(direction) {
     if (!this.alive || this.isJumping())
-      return
+      return false
 
     const next_x = this.position.x + direction.x * this.size
     const next_y = this.position.y + direction.y * this.size
 
     if (next_x > BOARD_W - this.size || next_x < 0 ||
       next_y > BOARD_H - this.size || next_y < 0)
-      return
+      return false
 
     this.facing = facingOf(direction)
     this.jump = { x: direction.x, y: direction.y }
     this.jumpFrames = JUMP_FRAMES
     this.position.x = next_x
     this.position.y = next_y
+    return true
   }
 
   // Suma la velocidad del tronco directamente (move() se bloquea en los bordes); si sale

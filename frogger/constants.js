@@ -22,7 +22,8 @@ const FPS = 60
 const JUMP_FRAMES = 6
 const DEATH_FRAME_TIME = 10
 const DEATH_WAIT_FRAMES = 60
-const END_SCREEN_FRAMES = 3 * FPS
+// Lo que dura GameOver.mp3 (≈4 s): el aviso de fin vuelve al menú cuando acaba.
+const END_SCREEN_FRAMES = 4 * FPS
 const TURTLE_FRAME_TIME = 15
 
 // Ciclo de las tortugas que se hunden (frames): 4 s a flote, 1 s hundiéndose,
@@ -38,6 +39,7 @@ const COLORS = {
   TEXT: '#C3C3D9',
   SCORE: '#E00000',
   TIME_BAR: '#1DC300',
+  TIME_BAR_LOW: '#E00000',
   TIME_LABEL: '#DFDF00',
 }
 
@@ -45,6 +47,7 @@ const COLORS = {
 const START_LIVES = 3
 const START_ROW = ROWS - 1
 const TIME_PER_LIFE = 30
+const TIME_WARNING_SECONDS = 10
 const EXTRA_LIFE_SCORE = 1000
 
 // Puntuación:
