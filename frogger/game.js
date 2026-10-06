@@ -45,7 +45,7 @@ class Game {
   constructor() {
     this.lives = START_LIVES
     this.score = 0
-    this.highScore = 0
+    this.highScore = loadHighScore()
     this.frog = null
     this.lanes = LANES
     this.menu = new Menu()
@@ -155,7 +155,10 @@ class Game {
 
   addScore(points) {
     this.score += points
-    this.highScore = Math.max(this.highScore, this.score)
+    if (this.score > this.highScore) {
+      this.highScore = this.score
+      saveHighScore(this.highScore)
+    }
     if (!this.extraLifeAwarded && this.score >= EXTRA_LIFE_SCORE) {
       this.lives++
       this.extraLifeAwarded = true
@@ -191,20 +194,13 @@ class Game {
   drawHUD() {
     const bottomY = HUD_TOP + BOARD_H
 
+    drawText('1-UP', 2 * CELL, 0, FONT_COLORS.WHITE)
+    drawText('HI-SCORE', 5 * CELL, 0, FONT_COLORS.WHITE)
+    drawText(nf(this.score, 5), 2 * CELL, FONT_SIZE, FONT_COLORS.RED)
+    drawText(nf(this.highScore, 5), 6 * CELL, FONT_SIZE, FONT_COLORS.RED)
+
     push()
     noStroke()
-    textFont('monospace')
-    textStyle(BOLD)
-    textSize(CELL / 2)
-    textAlign(LEFT, TOP)
-
-    fill(COLORS.TEXT)
-    text('1-UP', 2 * CELL, 1)
-    text('HI-SCORE', 5 * CELL, 1)
-    fill(COLORS.SCORE)
-    text(nf(this.score, 5), 2 * CELL, CELL / 2)
-    text(nf(this.highScore, 5), 6 * CELL, CELL / 2)
-
     fill(COLORS.ROAD)
     rect(0, bottomY, BOARD_W, HUD_BOTTOM)
     for (let i = 0; i < this.lives; i++)
@@ -215,25 +211,22 @@ class Game {
     const barWidth = 7 * CELL * this.timeLeft / (TIME_PER_LIFE * FPS)
     fill(this.isTimeLow() ? COLORS.TIME_BAR_LOW : COLORS.TIME_BAR)
     rect(barRight - barWidth, bottomY + CELL / 2, barWidth, CELL / 2)
-    fill(COLORS.TIME_LABEL)
-    textAlign(RIGHT, TOP)
-    text('TIME', BOARD_W, bottomY + CELL / 2)
+    drawText('TIME', barRight, bottomY + CELL / 2, FONT_COLORS.YELLOW)
 
     const message = this.stateMessage()
     if (message != null) {
       // Sobre la mediana (fila 6), donde el arcade muestra sus avisos.
       const middleY = HUD_TOP + 6 * CELL
-      textAlign(CENTER, CENTER)
+      const width = message.length * FONT_SIZE
       fill(COLORS.ROAD)
-      rect(BOARD_W / 2 - textWidth(message) / 2 - 4, middleY, textWidth(message) + 8, CELL)
-      fill(COLORS.SCORE)
-      text(message, BOARD_W / 2, middleY + CELL / 2)
+      rect((BOARD_W - width) / 2 - 4, middleY, width + 8, CELL)
+      drawTextCentered(message, middleY + (CELL - FONT_SIZE) / 2, FONT_COLORS.RED)
     }
     pop()
   }
 
   stateMessage() {
-    if (this.state == GAME_STATES.WON) return 'GANASTE'
+    if (this.state == GAME_STATES.WON) return 'YOU WON'
     if (this.state == GAME_STATES.GAME_OVER) return 'GAME OVER'
     return null
   }

@@ -36,11 +36,8 @@ const TURTLE_UNDER_FRAMES = 90
 const COLORS = {
   WATER: '#000047',
   ROAD: '#000000',
-  TEXT: '#C3C3D9',
-  SCORE: '#E00000',
   TIME_BAR: '#1DC300',
   TIME_BAR_LOW: '#E00000',
-  TIME_LABEL: '#DFDF00',
 }
 
 // Reglas
