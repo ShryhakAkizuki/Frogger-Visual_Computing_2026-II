@@ -47,7 +47,7 @@ function inputFromKey(key, keyCode) {
     return INPUT.LEFT
   if (keyCode == RIGHT_ARROW || key == "d" || key == "D")
     return INPUT.RIGHT
-  if (key == "r" || key == "R")
-    return INPUT.RESTART
+  if (keyCode == ENTER)
+    return INPUT.SELECT
   return INPUT.OTHER
 }

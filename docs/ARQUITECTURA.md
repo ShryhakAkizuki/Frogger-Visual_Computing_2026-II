@@ -11,7 +11,8 @@ Recrear el primer nivel de Frogger. La rana se mueve sobre un tablero de 14 colu
 
 ### ✅ Funciona
 
-- Tablero de 13 filas con HUD arriba (`1-UP` y `HI-SCORE` de la sesión) y abajo (vidas, barra de tiempo), con avisos para `READY` / `WON` / `GAME_OVER` sobre la mediana.
+- Tablero de 13 filas con HUD arriba (`1-UP` y `HI-SCORE` de la sesión) y abajo (vidas, barra de tiempo), con avisos para `WON` / `GAME_OVER` sobre la mediana.
+- Pantalla de título (`Menu`, según `FroggerTable.png`): logo `FROGGER`, opciones JUGAR / CREDITOS / DOCUMENTACION con una rana como cursor (flechas y Enter), submenú de créditos con VOLVER y enlace al repositorio en GitHub. Textos con la fuente del arcade (`font.png`).
 - Todo se dibuja con los sprites de `images/` a su tamaño real (canvas de 224×256, ampliado por CSS con un factor entero).
 - Salto animado (sprite de salto según la dirección) y animación de muerte en carretera / agua / tiempo, seguida de la calavera y una espera antes de reaparecer (estado `DYING`).
 - Rana con saltos de una celda (flechas o WASD), que no puede salir del tablero por sus propios medios.
@@ -26,7 +27,7 @@ Recrear el primer nivel de Frogger. La rana se mueve sobre un tablero de 14 colu
   - agujeros libres, ocupados y paredes de la meta.
 - `frameRate(FPS)` fijo en `setup()`: las velocidades son píxeles por frame y p5 por defecto corre a la frecuencia del monitor.
 - Tiempo por vida de 30 s contado en frames (exacto a `FPS`); al agotarse la rana muere. Se muestra en la barra inferior del HUD.
-- Vidas, score del original (10 por cada fila nueva alcanzada, 50 por agujero + bonus de 10 por segundo restante, 1000 por llenar las 5) y estados `READY` → `PLAYING` → `WON` / `GAME_OVER`, con `R` para reiniciar.
+- Vidas, score del original (10 por cada fila nueva alcanzada, 50 por agujero + bonus de 10 por segundo restante, 1000 por llenar las 5) y estados `MENU` → `PLAYING` → `WON` / `GAME_OVER`, que vuelven al menú a los 3 s (`END_SCREEN_FRAMES`) o con Enter.
 - Vida extra a los 1 000 puntos, una sola vez por partida.
 
 ### ⏳ Falta para completar el primer nivel
@@ -99,17 +100,18 @@ Los sprites ya miran en la dirección de su fila; no se voltean.
 
 Sin bundler (compatible con GitHub Pages). Los scripts se cargan en este orden en [`frogger/index.html`](../frogger/index.html), y el orden es obligatorio:
 
-`p5.min.js` → `constants.js` → `sprites.js` → `entities.js` → `frog.js` → `lanes.js` → `game.js` → `frogger.js`
+`p5.min.js` → `constants.js` → `sprites.js` → `entities.js` → `frog.js` → `lanes.js` → `menu.js` → `game.js` → `frogger.js`
 
 ```
 frogger/
 ├── index.html        # carga los scripts en el orden anterior
 ├── constants.js      # constantes compartidas: dimensiones, FPS, animaciones, colores, reglas y puntuación
-├── sprites.js        # SPRITES, loadSprites(), drawSprite()
+├── sprites.js        # SPRITES, loadSprites(), drawSprite(), drawText() (fuente del arcade)
 ├── entities.js       # MovingEntity (base), Vehicle, Log, Turtle, DivingTurtle
 ├── frog.js           # Frog, FROG_DEATH, rectsOverlap()
 ├── lanes.js          # Lane (interfaz base), SafeLane, HomeLane, RoadLane, RiverLane,
 │                     #   FROG_RESULT
+├── menu.js           # Menu (pantalla de título y créditos), MENU_PAGES, MENU_ACTION
 ├── game.js           # Game, LANES (definición de las 13 filas), GAME_STATES, INPUT
 ├── frogger.js        # bootstrap de p5: preload(), setup(), draw(), keyPressed(), escala del canvas. Sin lógica.
 └── libraries/p5.min.js
@@ -118,10 +120,11 @@ frogger/
 | Archivo | Responsabilidad |
 |---|---|
 | `constants.js` | Dimensiones (`CELL`, `COLS`, `ROWS`, `BOARD_W`, `BOARD_H`, `HUD_TOP`, `HUD_BOTTOM`, `FROG_X_OFFSET`), `FPS`, duración de animaciones, `COLORS` y reglas/puntuación de la partida. Sin lógica. |
-| `sprites.js` | Carga las imágenes de `../images/` en `preload()` y las dibuja por nombre con la posición redondeada. |
+| `sprites.js` | Carga las imágenes de `../images/` en `preload()` y las dibuja por nombre con la posición redondeada. `drawText()` escribe con `font.png` (glifos de 8×8 por color, sin tildes ni Ñ: se quitan al dibujar). |
 | `entities.js` | Qué se mueve y cómo se pinta. No conoce las reglas. |
 | `frog.js` | El jugador: salto, arrastre por tronco, caja de colisión, animaciones de salto y muerte. |
 | `lanes.js` | Las reglas **de cada tipo de fila**: qué le pasa a la rana en carretera, río o meta. |
+| `menu.js` | La pantalla de título: páginas (principal y créditos), cursor y dibujo. No conoce la partida: al elegir JUGAR devuelve `MENU_ACTION.PLAY`. Los nombres de los créditos y el enlace a GitHub están aquí. |
 | `game.js` | El estado de la partida (vidas, score, estado), la máquina de estados de entrada y las reglas **comunes**. |
 | `frogger.js` | Conecta p5.js con `Game`: carga sprites, escala el canvas y traduce cada tecla a un `INPUT` neutro. |
 
@@ -145,6 +148,8 @@ classDiagram
         +timeLeft: int
         +bestRow: int
         +extraLifeAwarded: bool
+        +menu: Menu
+        +stateFrames: int
         +update()
         +draw()
         +updateDying()
@@ -152,7 +157,9 @@ classDiagram
         +killFrog(cause)
         +loseLife()
         +respawnFrog()
-        +reset()
+        +startGame()
+        +returnToMenu()
+        +isOver()
         +handleInput(input)
         +setState(next)
         +tickTimer()
@@ -245,6 +252,15 @@ classDiagram
         +sprite()
     }
 
+    class Menu {
+        +page
+        +cursor
+        +open(page)
+        +handleInput(input) MENU_ACTION
+        +draw()
+    }
+
+    Game *-- "1" Menu
     Game *-- "13" Lane
     Game *-- "1" Frog
     Lane <|-- SafeLane
@@ -268,15 +284,16 @@ classDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> READY
-    READY --> PLAYING : cualquier tecla
+    [*] --> MENU
+    MENU --> MENU : flechas, CREDITOS, VOLVER, DOCUMENTACION
+    MENU --> PLAYING : Enter en JUGAR
     PLAYING --> PLAYING : llena un agujero
     PLAYING --> DYING : muere (carro, agua, arbusto, tiempo)
     DYING --> PLAYING : fin de la animación, quedan vidas
     DYING --> GAME_OVER : fin de la animación, lives == 0
     PLAYING --> WON : 5 agujeros llenos
-    WON --> READY : R
-    GAME_OVER --> READY : R
+    WON --> MENU : 3 s o Enter
+    GAME_OVER --> MENU : 3 s o Enter
 ```
 
 ### 5.3 Un frame
@@ -337,15 +354,16 @@ Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ri
 | `INPUT` | Origen (tecla) |
 |---|---|
 | `UP` / `DOWN` / `LEFT` / `RIGHT` | flechas / WASD |
-| `RESTART` | `R` |
+| `SELECT` | Enter |
 | `OTHER` | cualquier otra tecla |
 
 | Estado | INPUT | Efecto |
 |---|---|---|
-| `READY` | cualquiera | Empieza la partida (no mueve la rana). |
+| `MENU` | `UP` / `DOWN` | Mueve el cursor (rana) por las opciones de la página, con vuelta al otro extremo. |
+| `MENU` | `SELECT` | JUGAR → partida nueva en `PLAYING`; CREDITOS / VOLVER → cambia de página; DOCUMENTACION → abre el repositorio en otra pestaña. |
 | `PLAYING` | `UP` / `DOWN` / `LEFT` / `RIGHT` | Salto de una celda; se ignora mientras dura el salto anterior (`JUMP_FRAMES`). |
 | `DYING` | cualquiera | Se ignora. |
-| `WON` / `GAME_OVER` | `RESTART` | Partida nueva. |
+| `WON` / `GAME_OVER` | `SELECT` | Vuelve al menú sin esperar los 3 s. |
 
 ## 8. Decisiones de diseño
 
@@ -362,7 +380,7 @@ Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ri
 | Timestep | Píxeles por frame, sin `deltaTime`, a `FPS` fijos (`frameRate(FPS)` en `setup()`). | Simple para el MVP; el timer por vida se cuenta en frames enteros, exacto a esa frecuencia. |
 | Puntuación | `Game.addScore()` es el único punto donde sube el score; los valores de filas, agujeros y victoria viven en `constants.js`. | La vida extra se audita en un solo sitio y las reglas de puntos se ajustan en un solo archivo. |
 | Quién decide la victoria | `HomeLane`: devuelve `WIN` al llenar el último agujero; `Game` solo reacciona a `FROG_RESULT`. | `Game` no conoce los agujeros, y el enum `OK / DIE / HOME / WIN` cierra el contrato: ninguna otra fila puede devolver un resultado que `Game` no sepa manejar. |
-| Entrada | `frogger.js` traduce `key`/`keyCode` de p5 a un `INPUT` neutro; `Game.handleInput()` es la máquina de estados y `setState()` el único cambio de estado. `Frog.move()` recibe la dirección en celdas, sin p5. | El núcleo del juego no conoce los globals de p5, y las transiciones `READY` / `PLAYING` / `WON` / `GAME_OVER` se auditan en un solo sitio. |
+| Entrada | `frogger.js` traduce `key`/`keyCode` de p5 a un `INPUT` neutro; `Game.handleInput()` es la máquina de estados y `setState()` el único cambio de estado. `Frog.move()` recibe la dirección en celdas, sin p5. | El núcleo del juego no conoce los globals de p5, y las transiciones `MENU` / `PLAYING` / `WON` / `GAME_OVER` se auditan en un solo sitio. |
 | `ridingLog` | `Game.checkCollisions()` es el único escritor: pregunta `Lane.rideFor()` (consulta pura) y guarda el resultado; `Frog` solo lo lee. | Las filas no mutan a la rana y la corrección (arrastre) no depende del orden de las llamadas. |
 | Constantes | `constants.js` se carga primero, tras `p5.min.js`. | Todos los scripts pueden usar `CELL` / `BOARD_W` / ... al cargar; no hay dependencia inversa con el último script. |
 | Tamaño | `CELL` = tamaño del sprite (16 px) y canvas de 224×256; se amplía por CSS con un factor entero. | Los sprites se dibujan sin reescalar y el pixel art se ve nítido a cualquier tamaño de ventana. |

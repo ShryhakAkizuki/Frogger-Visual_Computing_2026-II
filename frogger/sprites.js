@@ -10,6 +10,7 @@ const SPRITE_NAMES = [
   'turtle_1', 'turtle_2', 'turtle_3', 'turtle_dive_1', 'turtle_dive_2',
   'home_bush', 'home_bush_edge', 'home_frog', 'home_fly',
   'sidewalk', 'life',
+  'font', 'title_logo',
 ]
 
 const SPRITES = {}
@@ -24,4 +25,26 @@ function loadSprites() {
 function drawSprite(name, x, y, w, h) {
   const img = SPRITES[name]
   image(img, Math.round(x), Math.round(y), w ?? img.width, h ?? img.height)
+}
+
+// font.png sale de FroggerAssets.png: una fila de glifos de 8×8 por color, en el orden de
+// FONT_CHARS. No tiene minúsculas, tildes ni Ñ.
+const FONT_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-©'
+const FONT_SIZE = 8
+const FONT_COLORS = { WHITE: 0, YELLOW: 1, RED: 2, MAGENTA: 3, CYAN: 4 }
+
+// NFD separa la tilde de su letra (Ñ → N + ~) y el resto se descarta: así los nombres en
+// español se escriben con los glifos del arcade. Un carácter sin glifo deja un hueco.
+function drawText(str, x, y, color) {
+  const chars = str.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  for (let i = 0; i < chars.length; i++) {
+    const glyph = FONT_CHARS.indexOf(chars[i])
+    if (glyph >= 0)
+      image(SPRITES.font, Math.round(x) + i * FONT_SIZE, Math.round(y), FONT_SIZE, FONT_SIZE,
+        glyph * FONT_SIZE, color * FONT_SIZE, FONT_SIZE, FONT_SIZE)
+  }
+}
+
+function drawTextCentered(str, y, color) {
+  drawText(str, (CANVAS_W - str.length * FONT_SIZE) / 2, y, color)
 }

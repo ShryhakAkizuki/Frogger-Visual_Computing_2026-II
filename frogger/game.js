@@ -1,11 +1,11 @@
-const GAME_STATES = { READY: 'READY', PLAYING: 'PLAYING', DYING: 'DYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
+const GAME_STATES = { MENU: 'MENU', PLAYING: 'PLAYING', DYING: 'DYING', WON: 'WON', GAME_OVER: 'GAME_OVER' }
 
 const INPUT = {
   UP: 'UP',
   DOWN: 'DOWN',
   LEFT: 'LEFT',
   RIGHT: 'RIGHT',
-  RESTART: 'RESTART',
+  SELECT: 'SELECT',
   OTHER: 'OTHER',
 }
 
@@ -36,26 +36,28 @@ const LANES = [
 
 class Game {
   constructor() {
-    this.state = GAME_STATES.READY
     this.lives = START_LIVES
     this.score = 0
     this.highScore = 0
     this.frog = null
     this.lanes = LANES
-    this.reset()
+    this.menu = new Menu()
+    this.setState(GAME_STATES.MENU)
   }
 
   // Único punto donde cambia el estado de la partida.
   setState(next) {
     this.state = next
+    this.stateFrames = 0
   }
 
   handleInput(input) {
-    if (this.state == GAME_STATES.READY) {
-      this.setState(GAME_STATES.PLAYING)
-    } else if (this.state == GAME_STATES.WON || this.state == GAME_STATES.GAME_OVER) {
-      if (input == INPUT.RESTART)
-        this.reset()
+    if (this.state == GAME_STATES.MENU) {
+      if (this.menu.handleInput(input) == MENU_ACTION.PLAY)
+        this.startGame()
+    } else if (this.isOver()) {
+      if (input == INPUT.SELECT)
+        this.returnToMenu()
     } else if (this.state == GAME_STATES.PLAYING) {
       const direction = DIRECTIONS[input]
       if (direction != null)
@@ -66,6 +68,12 @@ class Game {
   // El orden es exigido: frog.update() lee el ridingLog que acaba de fijar
   // checkCollisions(); así rana y tronco se desplazan lo mismo en el frame.
   update() {
+    this.stateFrames++
+    // El aviso de fin se ve un rato y la partida vuelve sola al menú (Enter lo adelanta).
+    if (this.isOver() && this.stateFrames >= END_SCREEN_FRAMES) {
+      this.returnToMenu()
+      return
+    }
     if (this.state == GAME_STATES.DYING) {
       this.updateDying()
       return
@@ -130,6 +138,11 @@ class Game {
   }
 
   draw() {
+    if (this.state == GAME_STATES.MENU) {
+      this.menu.draw()
+      return
+    }
+
     background(COLORS.WATER)
 
     // El tablero se desplaza para dejar sitio a la barra superior del HUD; así la lógica
@@ -195,9 +208,8 @@ class Game {
   }
 
   stateMessage() {
-    if (this.state == GAME_STATES.READY) return 'PULSA UNA TECLA'
-    if (this.state == GAME_STATES.WON) return 'GANASTE  R: REINICIAR'
-    if (this.state == GAME_STATES.GAME_OVER) return 'GAME OVER  R: REINICIAR'
+    if (this.state == GAME_STATES.WON) return 'GANASTE'
+    if (this.state == GAME_STATES.GAME_OVER) return 'GAME OVER'
     return null
   }
 
@@ -251,8 +263,17 @@ class Game {
     this.bestRow = START_ROW
   }
 
-  reset() {
-    this.setState(GAME_STATES.READY)
+  isOver() {
+    return this.state == GAME_STATES.WON || this.state == GAME_STATES.GAME_OVER
+  }
+
+  returnToMenu() {
+    this.menu.open(MENU_PAGES.MAIN)
+    this.setState(GAME_STATES.MENU)
+  }
+
+  startGame() {
+    this.setState(GAME_STATES.PLAYING)
     this.lives = START_LIVES
     this.score = 0
     this.extraLifeAwarded = false

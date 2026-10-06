@@ -18,6 +18,7 @@ Ajusta el `<base href>` a la ruta absoluta de `frogger/` y cambia solo el bloque
   <script src="entities.js"></script>
   <script src="frog.js"></script>
   <script src="lanes.js"></script>
+  <script src="menu.js"></script>
   <script src="game.js"></script>
   <script src="frogger.js"></script>
 </head>
@@ -28,7 +29,7 @@ Ajusta el `<base href>` a la ruta absoluta de `frogger/` y cambia solo el bloque
   window.addEventListener('load', () => setTimeout(() => {
     try {
       // Comprobaciones
-      game.handleInput(INPUT.UP)            // READY → PLAYING
+      game.handleInput(INPUT.SELECT)        // MENU → PLAYING (cursor en JUGAR)
       game.handleInput(INPUT.UP)            // salto
       for (let i = 0; i < 5; i++) game.update()
       log('estado', game.state)

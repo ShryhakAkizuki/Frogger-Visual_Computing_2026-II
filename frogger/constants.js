@@ -22,6 +22,7 @@ const FPS = 60
 const JUMP_FRAMES = 6
 const DEATH_FRAME_TIME = 10
 const DEATH_WAIT_FRAMES = 60
+const END_SCREEN_FRAMES = 3 * FPS
 const TURTLE_FRAME_TIME = 15
 
 // Ciclo de las tortugas que se hunden (frames): 4 s a flote, 1 s hundiéndose,
