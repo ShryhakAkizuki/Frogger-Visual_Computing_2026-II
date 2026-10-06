@@ -1,99 +1,6 @@
 # Frogger - Arquitectura
 
-## 1. Objetivo
-
-Recrear el primer nivel de Frogger. La rana se mueve sobre un tablero de 14 columnas × 13 filas de 16 px (el tamaño de los sprites de `images/`): cruza la carretera esquivando carros y el río saltando sobre troncos y tortugas, hasta llenar las 5 metas. La referencia visual es el arte del arcade original; las hojas de sprites y del menú están en `FroggerAssets.png` y `FroggerTable.png`.
-
-El primer nivel está **completo y jugable**. Al llenar las 5 metas la partida termina con `WON` (no hay segundo nivel).
-
-## 2. Estado del proyecto
-
-### Implementado
-
-**Pantallas y presentación**
-
-- Pantalla de título (`Menu`, según `FroggerTable.png`): logo `FROGGER`, opciones JUGAR / CREDITOS / DOCUMENTACION con una rana como cursor (flechas y Enter), submenú de créditos con VOLVER y enlace al repositorio en GitHub.
-- Tablero de 13 filas con HUD arriba (`1-UP` y `HI-SCORE`) y abajo (vidas y barra de tiempo), con avisos `YOU WON` / `GAME OVER` sobre la mediana. Todos los textos usan la fuente del arcade (`font.png`, vía `drawText()`).
-- Todo se dibuja con los sprites de `images/` a su tamaño real: canvas de 224×256, ampliado por CSS con un factor entero.
-
-**Jugabilidad**
-
-- Rana con saltos de una celda (flechas o WASD) y sprite de salto según la dirección. No puede salir del tablero por sus propios medios.
-- Cinco filas de carretera (carros, bulldozers y camiones) y cinco de río (troncos y tortugas), cada una con su velocidad, dirección y patrón de entidades. Las entidades reaparecen con retraso (pista circular) y los patrones se validan al arrancar.
-- Reglas: los carros matan, el río hunde, los troncos transportan, las tortugas que se hunden (una pareja en la fila 2 y un trío en la fila 5) ahogan a la rana si está encima cuando quedan bajo el agua, y morir arrastrada fuera del tablero también cuenta. Las metas pueden estar libres u ocupadas, y entre ellas hay paredes.
-- La **mosca** aparece en una meta libre al azar y da 200 puntos de bonus si la rana llega ahí antes de que se vaya.
-- Tiempo por vida de 30 s, contado en frames; al agotarse la rana muere. La barra del HUD pasa a rojo en los últimos 10 s.
-- Animación de muerte según la causa (carretera, agua o tiempo), seguida de la calavera y una espera antes de reaparecer (estado `DYING`).
-- Puntuación del original: 10 por cada fila nueva alcanzada, 50 por meta más 10 por cada segundo restante, 200 por la mosca y 1000 por llenar las 5. Vida extra a los 1000 puntos, una sola vez por partida.
-- Récord (`HI-SCORE`) persistente en `localStorage` (`storage.js`).
-- Estados `MENU` → `PLAYING` → `WON` / `GAME_OVER`; los dos últimos vuelven al menú a los 4 s (`END_SCREEN_FRAMES`, lo que dura `GameOver.mp3`) o con Enter.
-- Música y sonidos (`audio.js`, archivos en `music/`): `HomeScreen` en bucle en el menú, `MainSoundtrack` en bucle durante la partida (no se corta al morir), `GameOver` una vez al ganar o perder; `Hop` en cada salto, `DieOnLand` (carretera, arbusto y tiempo), `Drown` (agua), `Homed` al llegar a una meta y `TimeWarning` una vez por vida al bajar de 10 s.
-
-### Pendiente
-
-- **Rana hembra**: bonus del original que aparece sobre un tronco. No está implementada; el sprite de la rana de la meta (`home_frog`) ya existe.
-
-### Fuera del alcance
-
-Cosas del juego original que no se hicieron porque el proyecto cubre solo el primer nivel:
-
-- Serpiente, nutria y cocodrilos (en `images/` están sus sprites, pero ninguna fila los usa).
-- Niveles siguientes, con tráfico más rápido.
-- Pausa y opción de silenciar.
-
-## 3. Tablero
-
-14 columnas × 13 filas, `CELL = 16px` (un sprite) → tablero de 224×208. El canvas mide 224×256, como el arte original: `HUD_TOP` (2 filas) arriba y `HUD_BOTTOM` (1 fila) abajo. `frogger.js` lo amplía por CSS con el mayor factor entero que cabe en la ventana (`image-rendering: pixelated`).
-
-`Game.draw()` dibuja el tablero dentro de `translate(0, HUD_TOP)`. Así **toda la lógica usa coordenadas del tablero** (`y = 0` es la fila `HOME`), y solo el HUD usa coordenadas del canvas. El arbusto de la meta mide 24 px y sobresale 8 px por encima de la fila 0.
-
-La rana se mueve en una rejilla de 13 columnas desplazada media celda (`FROG_X_OFFSET = 8`), como en el arcade: así queda centrada y cae justo sobre las metas.
-
-| Fila | Tipo | Clase | Contenido |
-|---|---|---|---|
-| 0 | `HOME` | `HomeLane` | 5 metas (columnas 0, 3, 6, 9, 12 de la rana → x = 8, 56, 104, 152, 200) |
-| 1–5 | `RIVER` | `RiverLane` | Troncos (`Log`) y tortugas (`Turtle`) |
-| 6 | `SAFE` | `SafeLane` | Mediana |
-| 7–11 | `ROAD` | `RoadLane` | Camiones, carros y bulldozers |
-| 12 | `SAFE` | `SafeLane` | Inicio (rana en columna 6) |
-
-### 3.1 Filas en movimiento
-
-Cada fila se define en la constante `LANES` (`game.js`) como `new RiverLane(direction, speed, loopCells, pattern, Platform = Log)` o `new RoadLane(direction, speed, loopCells, pattern, sprite)`:
-
-| Parámetro | Significado |
-|---|---|
-| `direction` | −1 (←) o +1 (→). Común a toda la fila. |
-| `speed` | Píxeles por frame. Común a toda la fila. |
-| `loopCells` | Longitud de la **pista circular** de la fila, en celdas. Las celdas 0–13 son visibles; el resto queda fuera de pantalla. |
-| `pattern` | `[{ x, w }]`: posición inicial y ancho de cada entidad, en celdas sobre la pista (`x ≥ 14` empieza fuera de pantalla). En el río, una entrada puede llevar su propio `Platform` (p. ej. `{ x: 4, w: 2, Platform: DivingTurtle }`). |
-| `Platform` | Solo río: clase de lo que flota (`Log` o `Turtle`). |
-| `sprite` | Solo carretera: nombre del sprite de los vehículos (`truck` mide 2 celdas). |
-
-Cuando una entidad sale por un lado, recorre el tramo oculto de la pista antes de volver a entrar por el otro. Ese recorrido produce el retraso de reaparición del juego original. Las entidades se crean una vez por partida y nunca se borran.
-
-`Lane.validatePattern()` hace fallar el juego al arrancar, con un mensaje que indica la fila, si:
-- `loopCells < 14 + w` de la entidad más ancha, porque esa entidad aparecería de golpe dentro del tablero;
-- dos entidades se solapan, también a través del *wrap*.
-
-Valores actuales (la disposición copia la del arcade; las velocidades se ajustaron jugando):
-
-| Fila | Tipo | Dir. | `speed` | `loopCells` | `pattern` (`x`/`w`) | Sprite |
-|---|---|---|---|---|---|---|
-| 1 | `RIVER` | → | 0.35 | 18 | 0/4 · 6/4 · 12/4 | `Log` |
-| 2 | `RIVER` | ← | 0.45 | 17 | 0/2 · 4/2* · 9/2 · 13/2 | `Turtle` (*`DivingTurtle`) |
-| 3 | `RIVER` | → | 0.6 | 20 | 0/6 · 9/6 | `Log` |
-| 4 | `RIVER` | → | 0.4 | 17 | 0/3 · 5/3 · 10/3 | `Log` |
-| 5 | `RIVER` | ← | 0.35 | 17 | 0/3 · 5/3 · 10/3* | `Turtle` (*`DivingTurtle`) |
-| 7 | `ROAD` | ← | 0.45 | 16 | 0/2 · 7/2 | `truck` |
-| 8 | `ROAD` | → | 0.9 | 16 | 3/1 | `car_white` |
-| 9 | `ROAD` | ← | 0.6 | 15 | 0/1 · 5/1 · 9/1 | `car_pink` |
-| 10 | `ROAD` | → | 0.45 | 15 | 0/1 · 4/1 · 8/1 | `bulldozer` |
-| 11 | `ROAD` | ← | 0.5 | 15 | 0/1 · 4/1 · 8/1 | `car_yellow` |
-
-Los sprites ya miran en la dirección de su fila; no se voltean.
-
-## 4. Archivos y componentes
+## 1. Archivos y componentes
 
 Sin bundler (compatible con GitHub Pages). Los scripts se cargan en este orden en [`frogger/index.html`](../frogger/index.html), y el orden es obligatorio:
 
@@ -138,9 +45,9 @@ Fuera de `frogger/`, en la raíz del repositorio:
 
 Las constantes de `constants.js` se cargan primero (tras `p5.min.js`), así que todos los scripts pueden usarlas al cargar y las filas se crean directamente al cargar `game.js` (constante `LANES`). Las imágenes aún no existen en ese momento: filas y entidades guardan el **nombre** del sprite y lo buscan en `SPRITES` al dibujar.
 
-## 5. Diagramas
+## 2. Diagramas
 
-### 5.1 Clases
+### 2.1 Clases
 
 ```mermaid
 classDiagram
@@ -293,7 +200,7 @@ classDiagram
 - `Lane` es la interfaz que ve `Game`. Cada subclase **posee** sus entidades (`entities`), las crea en `build()` y decide qué le pasa a la rana en `checkFrog()`.
 - `Game` no tiene listas de carros ni de troncos, y no pregunta de qué tipo es cada fila: recorre `lanes` y llama a los mismos métodos en todas.
 
-### 5.2 Estados
+### 2.2 Estados
 
 ```mermaid
 stateDiagram-v2
@@ -309,7 +216,7 @@ stateDiagram-v2
     GAME_OVER --> MENU : 4 s o Enter
 ```
 
-### 5.3 Un frame
+### 2.3 Un frame
 
 ```mermaid
 sequenceDiagram
@@ -340,64 +247,9 @@ sequenceDiagram
 
 Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ridingLog` consultando `Lane.rideFor()` (único escritor: las filas no mutan a la rana), y después la rana y su tronco se desplazan lo mismo en ese frame, así que siguen alineados. El orden `tickTimer()` → `awardRowPoints()` → `checkCollisions()` → `lanes.update()` → `frog.update()` es exigido: el timer y las filas de puntos se resuelven sobre la posición de la rana del frame anterior, y `frog.update()` lee el `ridingLog` que acaba de fijar `checkCollisions()`.
 
-## 6. Reglas
+---
 
-| Dónde | Regla |
-|---|---|
-| `RoadLane.checkFrog` | La caja de la rana (`hitbox()`, 2 px más pequeña por lado) toca un carro → `DIE`. |
-| `RiverLane.rideFor` | El centro de la rana está sobre un tronco → lo devuelve; si no, `null`. `Game` lo guarda en `frog.ridingLog` (único escritor) y el tronco la arrastra. |
-| `RiverLane.checkFrog` | Hay tronco bajo la rana → `OK`; si no → `DIE`. |
-| `DivingTurtle.carries` | Ciclo por `age`: `TURTLE_SURFACE_FRAMES` a flote, `TURTLE_DIVE_FRAMES` hundiéndose (`turtle_dive_1/2`), `TURTLE_UNDER_FRAMES` bajo el agua y otros `TURTLE_DIVE_FRAMES` saliendo. Solo bajo el agua deja de llevar a la rana, así que `RiverLane.checkFrog` devuelve `DIE` (ahogada). |
-| `HomeLane.checkFrog` | El centro cae en una meta libre (rango de 16 px en x, `holeX(i)`) → el agujero queda lleno y devuelve `HOME`, o `WIN` si con ese se llena el último. Pared o agujero lleno → `DIE`. Si el agujero tenía la mosca, guarda `FLY_POINTS` de bonus. |
-| `HomeLane.update` | Mosca: tras una espera aleatoria (`FLY_WAIT_*`) aparece en una meta libre al azar durante `FLY_STAY_FRAMES` y desaparece si nadie se la come. |
-| `Lane.takeBonus` | `Game` lo llama al recibir `HOME`/`WIN` y suma los puntos extra (la mosca); en las demás filas es 0. |
-| `Lane.deathCause` | Animación de cada muerte: `WATER` en el río (también al salir del tablero arrastrada), `ROAD` en carretera y contra el arbusto de la meta, `TIME` (solo calavera) al agotarse el tiempo. |
-| `Game.checkCollisions` | El centro de la rana sale del tablero (arrastrada por un tronco) → muere. |
-| `Game.checkCollisions` | `HOME` → +`HOLE_POINTS` + bonus de tiempo + `lane.takeBonus()` y la rana reaparece. `WIN` → +`HOLE_POINTS` + bonus + `WIN_POINTS` y estado `WON` (la rana no reaparece). |
-| `Game.tickTimer` | `timeLeft` baja 1 frame por frame; al bajar de `TIME_WARNING_SECONDS` suena `TimeWarning` y la barra pasa a rojo; a 0 la rana muere. El reloj se para en `DYING`. Se reinicia a `TIME_PER_LIFE` en cada cruce. |
-| `Game.awardRowPoints` | `ROW_POINT` por cada fila nueva alcanzada, una vez por cruce (`bestRow` se reinicia al reaparecer). |
-| `Game.addScore` | Único punto donde sube el score; si supera el récord lo guarda (`saveHighScore()`) y al llegar a `EXTRA_LIFE_SCORE` otorga una vida extra, una sola vez por partida. |
-| `Game.killFrog` | Toda muerte pasa a `DYING`: la rana muestra 3 frames de `DEATH_FRAME_TIME` (según la causa) y la calavera durante `DEATH_WAIT_FRAMES`, mientras el tráfico sigue. |
-| `Game.loseLife` | Al terminar la animación resta una vida; con 0 → `GAME_OVER`, si no la rana reaparece en columna 6, fila 12, y vuelve a `PLAYING`. |
-
-## 7. Entrada
-
-`keyPressed()` (en `frogger.js`) traduce `key`/`keyCode` — los únicos globals de p5 que toca el proyecto — a un `INPUT` neutro y llama a `game.handleInput(input)`, que es la **máquina de estados de entrada**: cada estado decide qué hacer con el comando, y `Game.setState()` es el único punto donde cambia el estado de la partida.
-
-| `INPUT` | Origen (tecla) |
-|---|---|
-| `UP` / `DOWN` / `LEFT` / `RIGHT` | flechas / WASD |
-| `SELECT` | Enter |
-| `OTHER` | cualquier otra tecla |
-
-| Estado | INPUT | Efecto |
-|---|---|---|
-| `MENU` | `UP` / `DOWN` | Mueve el cursor (rana) por las opciones de la página, con vuelta al otro extremo. |
-| `MENU` | `SELECT` | JUGAR → partida nueva en `PLAYING`; CREDITOS / VOLVER → cambia de página; DOCUMENTACION → abre el repositorio en otra pestaña. |
-| `PLAYING` | `UP` / `DOWN` / `LEFT` / `RIGHT` | Salto de una celda; se ignora mientras dura el salto anterior (`JUMP_FRAMES`). |
-| `DYING` | cualquiera | Se ignora. |
-| `WON` / `GAME_OVER` | `SELECT` | Vuelve al menú sin esperar los 4 s. |
-
-## 8. Decisiones de diseño
-
-| Tema | Decisión | Por qué |
-|---|---|---|
-| Coordenadas | Todo en píxeles del tablero con `p5.Vector`; la rana salta `CELL` px. | Rana y entidades comparten sistema; no hay conversión grid ↔ píxel al ir sobre un tronco. |
-| Quién posee las entidades | Cada fila. | Polimorfismo: `Game` no necesita `instanceof` ni saber qué tipo de fila es. |
-| Reaparición de entidades | Pista circular por fila con tramo oculto. | Mismo efecto que crear/borrar en el borde, pero sin listas que crecen y con un patrón determinista. |
-| Patrones | A mano, en celdas, validados al arrancar. | Fácil de leer y de afinar jugando; un error de patrón se detecta enseguida. |
-| Velocidad y ancho | Velocidad y dirección por fila, ancho por entidad. | Como en el original: troncos largos y cortos en la misma fila del río. |
-| Colisión con carros | AABB con la caja de la rana reducida 2 px. | Rozar un carro con el borde no se siente como un choque. |
-| Colisión con troncos y agujeros | Por el centro de la rana. | Tocar con una esquina no basta, y la rana puede llegar desalineada desde un tronco. |
-| Arrastre | Suma directa a `position`, sin `move()`. | `move()` bloquea en los bordes y dejaría la rana desincronizada del tronco. |
-| Timestep | Píxeles por frame, sin `deltaTime`, a `FPS` fijos (`frameRate(FPS)` en `setup()`). | Simple; el timer por vida se cuenta en frames enteros, exacto a esa frecuencia. |
-| Puntuación | `Game.addScore()` es el único punto donde sube el score; los valores de filas, agujeros y victoria viven en `constants.js`. | La vida extra se audita en un solo sitio y las reglas de puntos se ajustan en un solo archivo. |
-| Quién decide la victoria | `HomeLane`: devuelve `WIN` al llenar el último agujero; `Game` solo reacciona a `FROG_RESULT`. | `Game` no conoce los agujeros, y el enum `OK / DIE / HOME / WIN` cierra el contrato: ninguna otra fila puede devolver un resultado que `Game` no sepa manejar. |
-| Entrada | `frogger.js` traduce `key`/`keyCode` de p5 a un `INPUT` neutro; `Game.handleInput()` es la máquina de estados y `setState()` el único cambio de estado. `Frog.move()` recibe la dirección en celdas, sin p5. | El núcleo del juego no conoce los globals de p5, y las transiciones `MENU` / `PLAYING` / `WON` / `GAME_OVER` se auditan en un solo sitio. |
-| `ridingLog` | `Game.checkCollisions()` es el único escritor: pregunta `Lane.rideFor()` (consulta pura) y guarda el resultado; `Frog` solo lo lee. | Las filas no mutan a la rana y la corrección (arrastre) no depende del orden de las llamadas. |
-| Constantes | `constants.js` se carga primero, tras `p5.min.js`. | Todos los scripts pueden usar `CELL` / `BOARD_W` / ... al cargar; no hay dependencia inversa con el último script. |
-| Tamaño | `CELL` = tamaño del sprite (16 px) y canvas de 224×256; se amplía por CSS con un factor entero. | Los sprites se dibujan sin reescalar y el pixel art se ve nítido a cualquier tamaño de ventana. |
-| Sprites | Se cargan en `preload()`; las filas guardan el nombre y `drawSprite()` redondea la posición. | `LANES` existe antes que las imágenes, y con velocidades fraccionarias el pixel art se deformaría entre píxeles. |
-| Salto | La posición lógica cambia de golpe; el dibujo interpola durante `JUMP_FRAMES` y la entrada se bloquea. | Las reglas y colisiones no cambian; el salto es solo visual. |
-| Muerte | Estado `DYING` con la vida descontada al final de la animación; `Lane.deathCause()` elige la animación. | La espera vive en la máquina de estados y `Game` sigue sin preguntar el tipo de fila. |
-| Rejilla de la rana | Desplazada `CELL / 2` respecto a la del tablero. | Como en el arcade: 13 posiciones centradas en 14 columnas que caen exactas en las 5 metas del arte. |
+Ver también: 
+- [TABLERO.md](TABLERO.md) (definición y patrones de las filas)
+- [REGLAS.md](REGLAS.md) (reglas que cada clase aplica)
+- [DISEÑO.md](DISEÑO.md) (por qué se hizo así)
