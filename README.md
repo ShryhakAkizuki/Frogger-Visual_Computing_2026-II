@@ -21,7 +21,7 @@ python3 -m http.server 8000
 
 ## Jugar en linea
 
-TODO: 
+[Enlace de juego - click aquí](https://shryhakakizuki.github.io/Frogger-Visual_Computing_2026-II/)
 
 ## Estructura
 
@@ -58,4 +58,4 @@ El juego implementa el primer nivel del juego. Queda faltando las entidades de l
 - Oscar Leonardo Riveros Perez
 - Camilo Ferney Londoño Moreno
 - Omar Nicolás Guerrero Guerrero
-
+- Oscar Ivan Ulises Gutiérrez Palacios
