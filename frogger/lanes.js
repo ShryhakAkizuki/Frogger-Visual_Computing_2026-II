@@ -1,5 +1,9 @@
 const FROG_RESULT = { OK: 'OK', DIE: 'DIE', HOME: 'HOME', WIN: 'WIN' }
 
+function randomFlyWait() {
+  return FLY_WAIT_MIN_FRAMES + Math.floor(Math.random() * (FLY_WAIT_MAX_FRAMES - FLY_WAIT_MIN_FRAMES))
+}
+
 class Lane {
   constructor() {
     this.row = 0
@@ -33,6 +37,11 @@ class Lane {
   // Elige la animación de muerte cuando checkFrog() devuelve DIE.
   deathCause() {
     return FROG_DEATH.ROAD
+  }
+
+  // Puntos extra del último checkFrog() que devolvió HOME/WIN; Game los suma y se consumen.
+  takeBonus() {
+    return 0
   }
 
   // Consulta pura: no modifica a la rana; Game guarda la respuesta en frog.ridingLog (único escritor).
@@ -93,11 +102,40 @@ class HomeLane extends Lane {
     super()
     this.holes = holes
     this.filled = holes.map(() => false)
+    this.resetFly()
   }
 
   build(row) {
     super.build(row)
     this.filled = this.holes.map(() => false)
+    this.resetFly()
+  }
+
+  resetFly() {
+    this.flyHole = -1
+    this.flyTimer = randomFlyWait()
+    this.bonus = 0
+  }
+
+  // La mosca aparece en una meta libre al azar y desaparece sola si nadie se la come.
+  update() {
+    this.flyTimer--
+    if (this.flyTimer > 0)
+      return
+
+    if (this.flyHole != -1) {
+      this.flyHole = -1
+      this.flyTimer = randomFlyWait()
+      return
+    }
+
+    const free = this.holes.map((_, i) => i).filter(i => !this.filled[i])
+    if (free.length > 0) {
+      this.flyHole = free[Math.floor(Math.random() * free.length)]
+      this.flyTimer = FLY_STAY_FRAMES
+    } else {
+      this.flyTimer = randomFlyWait()
+    }
   }
 
   // El arbusto mide 24 px de alto: sobresale 8 px por encima de la fila, hacia el HUD.
@@ -115,6 +153,8 @@ class HomeLane extends Lane {
       rect(x, this.row * CELL, CELL, CELL)
       if (this.filled[i])
         drawSprite('home_frog', x, this.row * CELL)
+      else if (i == this.flyHole)
+        drawSprite('home_fly', x, this.row * CELL)
     }
   }
 
@@ -125,7 +165,18 @@ class HomeLane extends Lane {
       return FROG_RESULT.DIE
 
     this.filled[hole] = true
+    if (hole == this.flyHole) {
+      this.bonus = FLY_POINTS
+      this.flyHole = -1
+      this.flyTimer = randomFlyWait()
+    }
     return this.allFilled() ? FROG_RESULT.WIN : FROG_RESULT.HOME
+  }
+
+  takeBonus() {
+    const points = this.bonus
+    this.bonus = 0
+    return points
   }
 
   allFilled() {

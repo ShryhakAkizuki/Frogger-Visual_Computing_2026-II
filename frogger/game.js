@@ -220,11 +220,11 @@ class Game {
     if (result == FROG_RESULT.DIE) {
       this.killFrog(lane.deathCause())
     } else if (result == FROG_RESULT.HOME) {
-      this.addScore(HOLE_POINTS + this.timeBonus())
+      this.addScore(HOLE_POINTS + this.timeBonus() + lane.takeBonus())
       this.respawnFrog()
     } else if (result == FROG_RESULT.WIN) {
       // Victoria: la decide HomeLane (conoce los agujeros); la rana no reaparece
-      this.addScore(HOLE_POINTS + this.timeBonus() + WIN_POINTS)
+      this.addScore(HOLE_POINTS + this.timeBonus() + lane.takeBonus() + WIN_POINTS)
       this.setState(GAME_STATES.WON)
     }
   }

@@ -8,7 +8,7 @@ const SPRITE_NAMES = [
   'car_pink', 'car_white', 'car_yellow', 'bulldozer', 'truck',
   'log_left', 'log_middle', 'log_right',
   'turtle_1', 'turtle_2', 'turtle_3', 'turtle_dive_1', 'turtle_dive_2',
-  'home_bush', 'home_bush_edge', 'home_frog',
+  'home_bush', 'home_bush_edge', 'home_frog', 'home_fly',
   'sidewalk', 'life',
 ]
 

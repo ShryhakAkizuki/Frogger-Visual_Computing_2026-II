@@ -39,7 +39,7 @@ En orden sugerido; los primeros son lógica pura y no dependen del aspecto visua
 
 **Opcional / por decidir:**
 
-- Peligros y bonus del original: serpiente, cocodrilos, mosca en un agujero, rana hembra.
+- Peligros y bonus del original: serpiente, cocodrilos, rana hembra.
 - Pasar al siguiente nivel al llenar los agujeros. Hoy `WON` termina la partida.
 - Sonido, pausa y récord persistente.
 
@@ -318,10 +318,12 @@ Las reglas se aplican **antes** de mover. `Game.checkCollisions()` fija `frog.ri
 | `RiverLane.rideFor` | El centro de la rana está sobre un tronco → lo devuelve; si no, `null`. `Game` lo guarda en `frog.ridingLog` (único escritor) y el tronco la arrastra. |
 | `RiverLane.checkFrog` | Hay tronco bajo la rana → `OK`; si no → `DIE`. |
 | `DivingTurtle.carries` | Ciclo por `age`: `TURTLE_SURFACE_FRAMES` a flote, `TURTLE_DIVE_FRAMES` hundiéndose (`turtle_dive_1/2`), `TURTLE_UNDER_FRAMES` bajo el agua y otros `TURTLE_DIVE_FRAMES` saliendo. Solo bajo el agua deja de llevar a la rana, así que `RiverLane.checkFrog` devuelve `DIE` (ahogada). |
-| `HomeLane.checkFrog` | El centro cae en una meta libre (rango de 16 px en x, `holeX(i)`) → el agujero queda lleno y devuelve `HOME`, o `WIN` si con ese se llena el último. Pared o agujero lleno → `DIE`. |
+| `HomeLane.checkFrog` | El centro cae en una meta libre (rango de 16 px en x, `holeX(i)`) → el agujero queda lleno y devuelve `HOME`, o `WIN` si con ese se llena el último. Pared o agujero lleno → `DIE`. Si el agujero tenía la mosca, guarda `FLY_POINTS` de bonus. |
+| `HomeLane.update` | Mosca: tras una espera aleatoria (`FLY_WAIT_*`) aparece en una meta libre al azar durante `FLY_STAY_FRAMES` y desaparece si nadie se la come. |
+| `Lane.takeBonus` | `Game` lo llama al recibir `HOME`/`WIN` y suma los puntos extra (la mosca); en las demás filas es 0. |
 | `Lane.deathCause` | Animación de cada muerte: `WATER` en el río (también al salir del tablero arrastrada), `ROAD` en carretera y contra el arbusto de la meta, `TIME` (solo calavera) al agotarse el tiempo. |
 | `Game.checkCollisions` | El centro de la rana sale del tablero (arrastrada por un tronco) → muere. |
-| `Game.checkCollisions` | `HOME` → +`HOLE_POINTS` + bonus de tiempo y la rana reaparece. `WIN` → +`HOLE_POINTS` + bonus + `WIN_POINTS` y estado `WON` (la rana no reaparece). |
+| `Game.checkCollisions` | `HOME` → +`HOLE_POINTS` + bonus de tiempo + `lane.takeBonus()` y la rana reaparece. `WIN` → +`HOLE_POINTS` + bonus + `WIN_POINTS` y estado `WON` (la rana no reaparece). |
 | `Game.tickTimer` | `timeLeft` baja 1 frame por frame; a 0 la rana muere. El reloj se para en `DYING`. Se reinicia a `TIME_PER_LIFE` en cada cruce. |
 | `Game.awardRowPoints` | `ROW_POINT` por cada fila nueva alcanzada, una vez por cruce (`bestRow` se reinicia al reaparecer). |
 | `Game.addScore` | Único punto donde sube el score; al llegar a `EXTRA_LIFE_SCORE` otorga una vida extra, una sola vez por partida. |

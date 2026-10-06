@@ -51,3 +51,9 @@ const ROW_POINT = 10
 const HOLE_POINTS = 50
 const HOLE_TIME_BONUS_PER_SECOND = 10
 const WIN_POINTS = 1000
+const FLY_POINTS = 200
+
+// La mosca (frames): espera con las metas sin mosca y permanencia en una meta.
+const FLY_WAIT_MIN_FRAMES = 240
+const FLY_WAIT_MAX_FRAMES = 600
+const FLY_STAY_FRAMES = 360
