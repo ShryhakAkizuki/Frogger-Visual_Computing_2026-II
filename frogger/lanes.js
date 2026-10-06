@@ -1,5 +1,9 @@
 const FROG_RESULT = { OK: 'OK', DIE: 'DIE', HOME: 'HOME', WIN: 'WIN' }
 
+function randomFlyWait() {
+  return FLY_WAIT_MIN_FRAMES + Math.floor(Math.random() * (FLY_WAIT_MAX_FRAMES - FLY_WAIT_MIN_FRAMES))
+}
+
 class Lane {
   constructor() {
     this.row = 0
@@ -30,6 +34,16 @@ class Lane {
     return FROG_RESULT.OK
   }
 
+  // Elige la animación de muerte cuando checkFrog() devuelve DIE.
+  deathCause() {
+    return FROG_DEATH.ROAD
+  }
+
+  // Puntos extra del último checkFrog() que devolvió HOME/WIN; Game los suma y se consumen.
+  takeBonus() {
+    return 0
+  }
+
   // Consulta pura: no modifica a la rana; Game guarda la respuesta en frog.ridingLog (único escritor).
   rideFor(frog) {
     return null
@@ -38,19 +52,19 @@ class Lane {
   fillRow(c) {
     noStroke()
     fill(c)
-    rect(0, this.row * CELL, BOARD, CELL)
+    rect(0, this.row * CELL, BOARD_W, CELL)
   }
 
   buildPattern(loopCells, pattern, make) {
     this.validatePattern(loopCells, pattern)
 
     const loopLength = loopCells * CELL
-    for (const { x, w } of pattern) {
+    for (const entry of pattern) {
       // Las x más allá del tablero se pasan al tramo izquierdo de la pista (fuera de pantalla)
-      let px = x * CELL
-      if (px >= BOARD)
+      let px = entry.x * CELL
+      if (px >= BOARD_W)
         px -= loopLength
-      this.entities.push(make(createVector(px, this.row * CELL), w * CELL, loopLength))
+      this.entities.push(make(createVector(px, this.row * CELL), entry.w * CELL, loopLength, entry))
     }
   }
 
@@ -78,7 +92,8 @@ class SafeLane extends Lane {
   }
 
   drawBackground() {
-    this.fillRow("purple")
+    for (let x = 0; x < BOARD_W; x += CELL)
+      drawSprite('sidewalk', x, this.row * CELL)
   }
 }
 
@@ -87,18 +102,59 @@ class HomeLane extends Lane {
     super()
     this.holes = holes
     this.filled = holes.map(() => false)
+    this.resetFly()
   }
 
   build(row) {
     super.build(row)
     this.filled = this.holes.map(() => false)
+    this.resetFly()
   }
 
+  resetFly() {
+    this.flyHole = -1
+    this.flyTimer = randomFlyWait()
+    this.bonus = 0
+  }
+
+  // La mosca aparece en una meta libre al azar y desaparece sola si nadie se la come.
+  update() {
+    this.flyTimer--
+    if (this.flyTimer > 0)
+      return
+
+    if (this.flyHole != -1) {
+      this.flyHole = -1
+      this.flyTimer = randomFlyWait()
+      return
+    }
+
+    const free = this.holes.map((_, i) => i).filter(i => !this.filled[i])
+    if (free.length > 0) {
+      this.flyHole = free[Math.floor(Math.random() * free.length)]
+      this.flyTimer = FLY_STAY_FRAMES
+    } else {
+      this.flyTimer = randomFlyWait()
+    }
+  }
+
+  // El arbusto mide 24 px de alto: sobresale 8 px por encima de la fila, hacia el HUD.
+  // Su hueco interior (gris en el sprite) se pinta del color del agua.
   drawBackground() {
-    this.fillRow("green")
+    const top = this.row * CELL - CELL / 2
+    for (let x = 0; x < BOARD_W; x += CELL / 2)
+      drawSprite('home_bush_edge', x, top)
+
+    noStroke()
+    fill(COLORS.WATER)
     for (let i = 0; i < this.holes.length; i++) {
-      fill(this.filled[i] ? "yellow" : "blue")
-      rect(this.holes[i] * CELL, this.row * CELL, CELL, CELL)
+      const x = this.holeX(i)
+      drawSprite('home_bush', x - CELL / 2, top)
+      rect(x, this.row * CELL, CELL, CELL)
+      if (this.filled[i])
+        drawSprite('home_frog', x, this.row * CELL)
+      else if (i == this.flyHole)
+        drawSprite('home_fly', x, this.row * CELL)
     }
   }
 
@@ -109,37 +165,53 @@ class HomeLane extends Lane {
       return FROG_RESULT.DIE
 
     this.filled[hole] = true
+    if (hole == this.flyHole) {
+      this.bonus = FLY_POINTS
+      this.flyHole = -1
+      this.flyTimer = randomFlyWait()
+    }
     return this.allFilled() ? FROG_RESULT.WIN : FROG_RESULT.HOME
+  }
+
+  takeBonus() {
+    const points = this.bonus
+    this.bonus = 0
+    return points
   }
 
   allFilled() {
     return this.filled.every(filled => filled)
   }
 
+  // `holes` son columnas de la rejilla de la rana, no del tablero.
+  holeX(i) {
+    return FROG_X_OFFSET + this.holes[i] * CELL
+  }
+
   holeAt(x) {
-    return this.holes.indexOf(floor(x / CELL))
+    return this.holes.findIndex((_, i) => x >= this.holeX(i) && x <= this.holeX(i) + CELL)
   }
 }
 
 class RoadLane extends Lane {
-  constructor(direction, speed, loopCells, pattern, vehicleColor = "#FF0000") {
+  constructor(direction, speed, loopCells, pattern, sprite) {
     super()
     this.direction = direction
     this.speed = speed
     this.loopCells = loopCells
     this.pattern = pattern
-    this.vehicleColor = vehicleColor
+    this.sprite = sprite
   }
 
   build(row) {
     super.build(row)
     this.buildPattern(this.loopCells, this.pattern, (position, width, loopLength) =>
       new Vehicle(position, width, CELL, this.speed, createVector(this.direction, 0),
-                  loopLength, this.vehicleColor))
+                  loopLength, this.sprite))
   }
 
   drawBackground() {
-    this.fillRow("black")
+    this.fillRow(COLORS.ROAD)
   }
 
   checkFrog(frog) {
@@ -152,22 +224,27 @@ class RoadLane extends Lane {
 }
 
 class RiverLane extends Lane {
-  constructor(direction, speed, loopCells, pattern) {
+  // `Platform` es la clase de lo que flota (Log o Turtle): ambas llevan a la rana igual.
+  // Una entrada del patrón puede cambiarla con su propio `Platform` (p. ej. DivingTurtle).
+  constructor(direction, speed, loopCells, pattern, Platform = Log) {
     super()
     this.direction = direction
     this.speed = speed
     this.loopCells = loopCells
     this.pattern = pattern
+    this.Platform = Platform
   }
 
   build(row) {
     super.build(row)
-    this.buildPattern(this.loopCells, this.pattern, (position, width, loopLength) =>
-      new Log(position, width, CELL, this.speed, createVector(this.direction, 0), loopLength))
+    this.buildPattern(this.loopCells, this.pattern, (position, width, loopLength, entry) => {
+      const Platform = entry.Platform || this.Platform
+      return new Platform(position, width, CELL, this.speed, createVector(this.direction, 0), loopLength)
+    })
   }
 
   drawBackground() {
-    this.fillRow("blue")
+    this.fillRow(COLORS.WATER)
   }
 
   rideFor(frog) {
@@ -176,5 +253,9 @@ class RiverLane extends Lane {
 
   checkFrog(frog) {
     return this.rideFor(frog) ? FROG_RESULT.OK : FROG_RESULT.DIE
+  }
+
+  deathCause() {
+    return FROG_DEATH.WATER
   }
 }
